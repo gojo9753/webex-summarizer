@@ -23,7 +23,7 @@ public class WebExMessageService {
     
     private static final Logger logger = LoggerFactory.getLogger(WebExMessageService.class);
     private static final String API_BASE_URL = "https://webexapis.com/v1";
-    private static final int MAX_MESSAGES_PER_REQUEST = 100;
+    private static final int MAX_MESSAGES_PER_REQUEST = 1000;
     
     private final WebExAuthenticator authenticator;
     private final WebExRoomService roomService;
