@@ -22,13 +22,16 @@ import java.nio.file.Paths;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Scanner;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Callable;
 
 @Command(name = "webex-summarizer", 
         description = "Download and summarize WebEx conversations",
         mixinStandardHelpOptions = true,
-        version = "1.0")
-public class WebExSummarizerCli implements Runnable {
+        version = "1.0",
+        subcommands = {
+            ModelListCommand.class
+        })
+public class WebExSummarizerCli implements Callable<Integer> {
     
     private static final Logger logger = LoggerFactory.getLogger(WebExSummarizerCli.class);
     
@@ -69,8 +72,17 @@ public class WebExSummarizerCli implements Runnable {
     private ConversationStorage storage;
     private LlmSummarizer summarizer;
     
+    @Option(names = {"-p", "--aws-profile"}, description = "AWS profile to use")
+    private String awsProfile;
+    
+    @Option(names = {"--region"}, description = "AWS region to use")
+    private String awsRegion;
+    
+    @Option(names = {"-m", "--model"}, description = "AWS Bedrock model ID to use")
+    private String modelId;
+    
     @Override
-    public void run() {
+    public Integer call() {
         try {
             // Initialize components
             configLoader = new ConfigLoader(configPath);
@@ -101,9 +113,11 @@ public class WebExSummarizerCli implements Runnable {
             } else {
                 System.out.println("No command specified. Use --help for usage information.");
             }
+            return 0;
         } catch (Exception e) {
             logger.error("Error: {}", e.getMessage(), e);
             System.err.println("Error: " + e.getMessage());
+            return 1;
         }
     }
     
@@ -127,9 +141,21 @@ public class WebExSummarizerCli implements Runnable {
         
         // Initialize summarizer if needed
         if (summarize) {
-            String llmApiEndpoint = configLoader.getProperty("llm.api.endpoint");
-            String llmApiKey = configLoader.getProperty("llm.api.key");
-            summarizer = new LlmSummarizer(llmApiEndpoint, llmApiKey);
+            // Use AWS profile from command line or config file
+            String profile = awsProfile != null ? awsProfile : configLoader.getProperty("aws.profile", "default");
+            if ("rivendel".equals(profile)) {
+                logger.info("Using 'rivendel' AWS profile as specified");
+            }
+            
+            // Use AWS region from command line or config file
+            String region = awsRegion != null ? awsRegion : configLoader.getProperty("aws.region", "us-east-1");
+            
+            // Use model ID from command line or config file
+            String model = modelId != null ? modelId : configLoader.getProperty("aws.bedrock.model", "anthropic.claude-v2");
+            
+            summarizer = new LlmSummarizer(profile, region, model);
+            logger.info("LLM Summarizer initialized with AWS Bedrock (profile: {}, region: {}, model: {})",
+                        profile, region, model);
         }
     }
     
@@ -273,7 +299,8 @@ public class WebExSummarizerCli implements Runnable {
     }
     
     public static void main(String[] args) {
-        int exitCode = new CommandLine(new WebExSummarizerCli()).execute(args);
+        CommandLine cmd = new CommandLine(new WebExSummarizerCli());
+        int exitCode = cmd.execute(args);
         System.exit(exitCode);
     }
 }

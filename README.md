@@ -1,6 +1,6 @@
 # WebEx Conversation Downloader & Summarizer
 
-A Java application for downloading conversations from Cisco WebEx rooms and generating summaries using Large Language Models (LLMs).
+A Java application for downloading conversations from Cisco WebEx rooms and generating summaries using AWS Bedrock's Large Language Models (LLMs).
 
 ## Features
 
@@ -8,15 +8,17 @@ A Java application for downloading conversations from Cisco WebEx rooms and gene
 - **Room Selection**: Download conversations from specific WebEx rooms
 - **Pagination Support**: Automatically handles paginated API responses to retrieve all messages
 - **Local Storage**: Store downloaded conversations in structured JSON format
-- **Conversation Summarization**: Generate concise summaries of conversations using OpenAI's LLM
+- **Conversation Summarization**: Generate concise summaries of conversations using AWS Bedrock's LLMs
 - **Command-line Interface**: Simple CLI for all operations
+- **AWS Integration**: Uses AWS SDK and credentials for secure access to Bedrock models
 
 ## Requirements
 
 - Java 11 or newer
 - Maven 3.6 or newer
 - A Cisco WebEx account with API access
-- An OpenAI API key for the summarization feature
+- An AWS account with access to AWS Bedrock
+- AWS credentials configured (via AWS CLI or credentials file)
 
 ## Installation
 
@@ -31,25 +33,34 @@ A Java application for downloading conversations from Cisco WebEx rooms and gene
    mvn clean package
    ```
 
-3. Run the application to generate a default configuration file:
+3. Ensure you have configured AWS credentials (either through AWS CLI or by creating a `~/.aws/credentials` file)
+
+4. Run the application to generate a default configuration file:
    ```
    java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar
    ```
 
-4. Edit the generated `config.properties` file with your WebEx token and OpenAI API key.
+5. Edit the generated `config.properties` file with your WebEx token and AWS settings.
 
 ## Configuration
 
 Edit the `config.properties` file with the following information:
 
 ```properties
+# WebEx Configuration
 webex.token=YOUR_WEBEX_TOKEN
 storage.directory=conversations
-llm.api.endpoint=https://api.openai.com/v1/chat/completions
-llm.api.key=YOUR_OPENAI_API_KEY
+
+# AWS Bedrock Configuration
+aws.profile=rivendel
+aws.region=us-east-1
+aws.bedrock.model=anthropic.claude-v2
 ```
 
-You can obtain a WebEx token from the [Cisco WebEx Developer Portal](https://developer.webex.com/).
+- You can obtain a WebEx token from the [Cisco WebEx Developer Portal](https://developer.webex.com/)
+- The AWS profile "rivendel" will be used by default, but can be overridden with command-line options
+- AWS region defaults to us-east-1 but can be changed
+- Default model is Claude v2 from Anthropic, but you can choose other models with the list-models command
 
 ## Usage
 
@@ -92,6 +103,11 @@ Download a conversation and generate a summary in one command:
 java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -r ROOM_ID -s
 ```
 
+You can specify AWS options:
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -r ROOM_ID -s -p custom-profile --region us-west-2 -m anthropic.claude-3-sonnet-20240229-v1:0
+```
+
 ### List Downloaded Files
 
 List previously downloaded conversation files:
@@ -114,6 +130,20 @@ Generate a summary for a previously downloaded conversation:
 
 ```
 java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -s path/to/conversation/file.json
+```
+
+### List Available Bedrock Models
+
+View the available AWS Bedrock models:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar list-models
+```
+
+To get details about a specific model:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar list-models --detail MODEL_ID
 ```
 
 ## Output Format
