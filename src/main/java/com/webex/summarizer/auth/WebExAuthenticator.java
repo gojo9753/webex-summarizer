@@ -19,6 +19,7 @@ public class WebExAuthenticator {
         this.oAuthService = new ServiceBuilder(clientId)
                 .apiSecret(clientSecret)
                 .callback(redirectUri)
+                // Use default scopes from developer portal
                 .build(new WebExOAuthApi());
     }
     
@@ -46,6 +47,10 @@ public class WebExAuthenticator {
             throw new IllegalStateException("Not authenticated. Call handleCallback() first.");
         }
         return accessToken.getAccessToken();
+    }
+    
+    public void setAccessToken(String token) {
+        this.accessToken = new OAuth2AccessToken(token);
     }
     
     public boolean isAuthenticated() {

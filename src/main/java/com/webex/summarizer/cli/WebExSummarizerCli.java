@@ -39,6 +39,9 @@ public class WebExSummarizerCli implements Runnable {
     @Option(names = {"-a", "--auth"}, description = "Perform WebEx authentication")
     private boolean auth = false;
     
+    @Option(names = {"--token"}, description = "Set WebEx API token directly")
+    private String token;
+    
     @Option(names = {"-l", "--list-rooms"}, description = "List available WebEx rooms")
     private boolean listRooms = false;
     
@@ -75,6 +78,8 @@ public class WebExSummarizerCli implements Runnable {
             
             if (auth) {
                 performAuthentication();
+            } else if (token != null) {
+                saveDirectToken();
             } else if (listFiles) {
                 listConversationFiles();
             } else if (listRooms) {
@@ -108,6 +113,9 @@ public class WebExSummarizerCli implements Runnable {
             throw new IOException("No access token found. Please authenticate first using --auth.");
         }
         
+        // Set token in authenticator
+        authenticator.setAccessToken(accessToken);
+        
         // Initialize API services
         roomService = new WebExRoomService(authenticator);
         messageService = new WebExMessageService(authenticator, roomService);
@@ -130,8 +138,10 @@ public class WebExSummarizerCli implements Runnable {
             
             System.out.println("Please open the following URL in your browser:");
             System.out.println(authenticator.getAuthorizationUrl());
-            System.out.println("\nAfter authorization, you will be redirected to a page.");
-            System.out.println("Please enter the code parameter from the URL:");
+            System.out.println("\nAfter authorization, you will be redirected to an error page (since no server is running).");
+            System.out.println("Copy the 'code' parameter from the URL in your browser address bar.");
+            System.out.println("It will look like: http://localhost:8080/callback?code=COPY_THIS_CODE");
+            System.out.println("\nPlease enter just the code value here:");
             
             Scanner scanner = new Scanner(System.in);
             String code = scanner.nextLine().trim();
@@ -146,6 +156,17 @@ public class WebExSummarizerCli implements Runnable {
         } catch (IOException | InterruptedException | ExecutionException e) {
             logger.error("Authentication error: {}", e.getMessage(), e);
             System.err.println("Authentication error: " + e.getMessage());
+        }
+    }
+    
+    private void saveDirectToken() {
+        try {
+            configLoader.setProperty("webex.access.token", token);
+            configLoader.saveProperties();
+            System.out.println("Token saved successfully.");
+        } catch (Exception e) {
+            logger.error("Error saving token: {}", e.getMessage(), e);
+            System.err.println("Error saving token: " + e.getMessage());
         }
     }
     
