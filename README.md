@@ -24,7 +24,7 @@ A Java application for downloading conversations from Cisco WebEx rooms and gene
 
 1. Clone this repository:
    ```
-   git clone https://github.com/your-username/webex-summarizer.git
+   git clone https://github.com/gojo9753/webex-summarizer.git
    cd webex-summarizer
    ```
 
