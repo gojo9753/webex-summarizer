@@ -4,11 +4,11 @@ A Java application for downloading conversations from Cisco WebEx rooms and gene
 
 ## Features
 
-- **WebEx Authentication**: Securely authenticate with the Cisco WebEx API using OAuth 2.0
+- **WebEx Authentication**: Simple token-based authentication with the Cisco WebEx API
 - **Room Selection**: Download conversations from specific WebEx rooms
 - **Pagination Support**: Automatically handles paginated API responses to retrieve all messages
 - **Local Storage**: Store downloaded conversations in structured JSON format
-- **Conversation Summarization**: Generate concise summaries of conversations using configurable LLMs
+- **Conversation Summarization**: Generate concise summaries of conversations using OpenAI's LLM
 - **Command-line Interface**: Simple CLI for all operations
 
 ## Requirements
@@ -16,7 +16,7 @@ A Java application for downloading conversations from Cisco WebEx rooms and gene
 - Java 11 or newer
 - Maven 3.6 or newer
 - A Cisco WebEx account with API access
-- API credentials for your preferred LLM service (e.g., OpenAI)
+- An OpenAI API key for the summarization feature
 
 ## Installation
 
@@ -36,34 +36,37 @@ A Java application for downloading conversations from Cisco WebEx rooms and gene
    java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar
    ```
 
-4. Edit the generated `config.properties` file with your WebEx API credentials and LLM API details.
+4. Edit the generated `config.properties` file with your WebEx token and OpenAI API key.
 
 ## Configuration
 
 Edit the `config.properties` file with the following information:
 
 ```properties
-webex.client.id=YOUR_WEBEX_CLIENT_ID
-webex.client.secret=YOUR_WEBEX_CLIENT_SECRET
-webex.redirect.uri=http://localhost:8080/callback
+webex.token=YOUR_WEBEX_TOKEN
 storage.directory=conversations
-llm.api.endpoint=https://api.openai.com/v1/completions
-llm.api.key=YOUR_LLM_API_KEY
+llm.api.endpoint=https://api.openai.com/v1/chat/completions
+llm.api.key=YOUR_OPENAI_API_KEY
 ```
 
-You can obtain WebEx API credentials from the [Cisco WebEx Developer Portal](https://developer.webex.com/).
+You can obtain a WebEx token from the [Cisco WebEx Developer Portal](https://developer.webex.com/).
 
 ## Usage
 
-### Authentication
+### Set Your WebEx Token
 
-First, authenticate with the WebEx API to obtain an access token:
+There are two ways to set your WebEx token:
 
-```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar --auth
-```
+1. Enter it interactively:
+   ```
+   java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar --auth
+   ```
+   When prompted, enter your WebEx token.
 
-Follow the prompts to complete the OAuth authentication flow.
+2. Provide it directly as a command-line argument:
+   ```
+   java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar --token YOUR_WEBEX_TOKEN
+   ```
 
 ### List Available Rooms
 
@@ -78,7 +81,7 @@ java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar --list-
 Download messages from a specific room (replace ROOM_ID with the ID from the list-rooms command):
 
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar --room ROOM_ID
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -r ROOM_ID
 ```
 
 ### Generate a Summary
@@ -86,7 +89,7 @@ java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar --room 
 Download a conversation and generate a summary in one command:
 
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar --room ROOM_ID --summarize
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -r ROOM_ID -s
 ```
 
 ### List Downloaded Files
@@ -97,12 +100,20 @@ List previously downloaded conversation files:
 java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar --list-files
 ```
 
+### Read an Existing Conversation
+
+Read a previously downloaded conversation without summarizing:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar --read path/to/conversation/file.json
+```
+
 ### Summarize an Existing Conversation
 
 Generate a summary for a previously downloaded conversation:
 
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar --summarize path/to/conversation/file.json
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -s path/to/conversation/file.json
 ```
 
 ## Output Format
@@ -120,7 +131,7 @@ The JSON structure includes:
 ## Security Notes
 
 - API tokens and keys are stored in the local configuration file. Ensure this file has appropriate permissions.
-- The application requires OAuth 2.0 authentication with WebEx to access room data.
+- The application uses direct token authentication with WebEx to access room data.
 
 ## Development
 
