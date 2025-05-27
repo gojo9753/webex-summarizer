@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.time.format.DateTimeFormatter;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.Callable;
@@ -274,28 +275,106 @@ public class WebExSummarizerCli implements Callable<Integer> {
             System.out.println("Loading conversation from " + filePath);
             Conversation conversation = storage.loadConversation(filePath);
             
-            System.out.println("\n=== CONVERSATION MESSAGES ===");
+            // Print conversation header with styling
+            System.out.println("\n╔══════════════════════════════════════════════════════════════════════════════╗");
+            System.out.println("║                         CONVERSATION MESSAGES                              ║");
+            System.out.println("╚══════════════════════════════════════════════════════════════════════════════╝");
             System.out.println("Room: " + conversation.getRoom().getTitle());
             System.out.println("Messages: " + conversation.getMessages().size());
-            System.out.println("Download Date: " + conversation.getDownloadDate());
-            System.out.println("\n");
+            System.out.println("Download Date: " + formatDateTime(conversation.getDownloadDate()));
+            System.out.println("");
             
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            String currentDate = null;
+            
+            // Group messages by date for better readability
             for (Message message : conversation.getMessages()) {
-                System.out.println("[" + message.getCreated().format(formatter) + "] " + 
-                                   message.getPersonEmail() + ": " + message.getText());
-                System.out.println("-----");
+                String messageDate = message.getCreated().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                
+                // Print date header when day changes
+                if (currentDate == null || !currentDate.equals(messageDate)) {
+                    currentDate = messageDate;
+                    System.out.println("\n┌──────────────────────────────────────────────────────────────────────────────┐");
+                    System.out.println("│ " + currentDate + "                                                          │");
+                    System.out.println("└──────────────────────────────────────────────────────────────────────────────┘");
+                }
+                
+                // Show time and author with clear formatting
+                System.out.println("\n[" + message.getCreated().format(DateTimeFormatter.ofPattern("HH:mm:ss")) + "] " + 
+                                   formatSender(message.getPersonEmail()));
+                
+                // Handle multiline message text with proper indentation
+                if (message.getText() != null) {
+                    String[] lines = message.getText().split("\n");
+                    for (String line : lines) {
+                        System.out.println("    " + line);
+                    }
+                }
+                
+                System.out.println("────────────────────────────────────────────────────────────────────────────────");
             }
             
-            // If a summary exists, display it too
+            // If a summary exists, display it with nice formatting
             if (conversation.getSummary() != null && !conversation.getSummary().isEmpty()) {
-                System.out.println("\n=== SUMMARY ===");
-                System.out.println(conversation.getSummary());
+                System.out.println("\n╔══════════════════════════════════════════════════════════════════════════════╗");
+                System.out.println("║                             SUMMARY                                        ║");
+                System.out.println("╚══════════════════════════════════════════════════════════════════════════════╝");
+                
+                // Print each line of the summary with proper formatting
+                String[] summaryLines = conversation.getSummary().split("\n");
+                for (String line : summaryLines) {
+                    if (line.trim().isEmpty()) {
+                        System.out.println(); // preserve empty lines
+                    } else {
+                        System.out.println("  " + line);
+                    }
+                }
             }
         } catch (IOException e) {
             logger.error("Failed to read conversation: {}", e.getMessage(), e);
             System.err.println("Failed to read conversation: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Helper method to format email addresses for display
+     */
+    private String formatSender(String email) {
+        if (email == null) {
+            return "Unknown sender";
+        }
+        
+        // Extract the name part of the email if possible
+        if (email.contains("@")) {
+            String name = email.substring(0, email.indexOf('@'));
+            name = name.replace(".", " ");
+            
+            // Capitalize words
+            StringBuilder formattedName = new StringBuilder();
+            String[] words = name.split(" ");
+            for (String word : words) {
+                if (!word.isEmpty()) {
+                    formattedName.append(Character.toUpperCase(word.charAt(0)))
+                               .append(word.substring(1))
+                               .append(" ");
+                }
+            }
+            
+            return formattedName.toString().trim();
+        }
+        
+        return email;
+    }
+    
+    /**
+     * Helper method to format date-time values from ZonedDateTime
+     */
+    private String formatDateTime(ZonedDateTime dateTime) {
+        if (dateTime == null) {
+            return "Unknown date";
+        }
+        
+        return dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
     
     public static void main(String[] args) {

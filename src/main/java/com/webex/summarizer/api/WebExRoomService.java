@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.webex.summarizer.auth.WebExAuthenticator;
 import com.webex.summarizer.model.Room;
+import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -38,9 +39,12 @@ public class WebExRoomService {
             throw new IllegalStateException("Not authenticated");
         }
         
-        String url = API_BASE_URL + "/rooms";
+        // Build URL with query params - set max to 1000 (the API maximum) to get more rooms at once
+        HttpUrl.Builder urlBuilder = HttpUrl.parse(API_BASE_URL + "/rooms").newBuilder();
+        urlBuilder.addQueryParameter("max", "1000");  // Maximum allowed by WebEx API
+        
         Request request = new Request.Builder()
-                .url(url)
+                .url(urlBuilder.build())
                 .header("Authorization", "Bearer " + authenticator.getAccessToken())
                 .build();
         
