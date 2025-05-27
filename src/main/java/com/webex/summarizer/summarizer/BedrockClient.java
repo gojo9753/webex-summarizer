@@ -60,11 +60,11 @@ public class BedrockClient {
         claude2.put("provider", "Anthropic");
         models.add(claude2);
         
-        Map<String, String> claude3 = new HashMap<>();
-        claude3.put("id", "anthropic.claude-3-sonnet-20240229-v1:0");
-        claude3.put("name", "Claude 3 Sonnet");
-        claude3.put("provider", "Anthropic");
-        models.add(claude3);
+        Map<String, String> claude2_1 = new HashMap<>();
+        claude2_1.put("id", "anthropic.claude-v2:1");
+        claude2_1.put("name", "Claude v2.1");
+        claude2_1.put("provider", "Anthropic");
+        models.add(claude2_1);
         
         Map<String, String> titan = new HashMap<>();
         titan.put("id", "amazon.titan-text-express-v1");
