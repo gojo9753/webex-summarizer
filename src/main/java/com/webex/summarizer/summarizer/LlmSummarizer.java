@@ -38,14 +38,20 @@ public class LlmSummarizer {
                 "Focus on the key points, decisions made, action items, and significant information shared. " +
                 "Structure your response to highlight the main topics discussed.\n\n" + conversationText;
         
-        // Create request body based on the LLM service being used
-        // This example assumes a generic format, modify as needed for specific LLM APIs
-        String requestBody = objectMapper.writeValueAsString(
-                objectMapper.createObjectNode()
-                        .put("model", "gpt-3.5-turbo")  // Example model, replace with configurable option
-                        .put("prompt", prompt)
-                        .put("max_tokens", 500)
-                        .put("temperature", 0.7));
+        // Create request body for OpenAI API
+        var messagesArray = objectMapper.createArrayNode();
+        var userMessage = objectMapper.createObjectNode();
+        userMessage.put("role", "user");
+        userMessage.put("content", prompt);
+        messagesArray.add(userMessage);
+        
+        var rootNode = objectMapper.createObjectNode();
+        rootNode.set("messages", messagesArray);
+        rootNode.put("model", "gpt-3.5-turbo");
+        rootNode.put("max_tokens", 500);
+        rootNode.put("temperature", 0.7);
+        
+        String requestBody = objectMapper.writeValueAsString(rootNode);
         
         Request request = new Request.Builder()
                 .url(llmApiEndpoint)
@@ -61,9 +67,8 @@ public class LlmSummarizer {
             
             JsonNode responseJson = objectMapper.readTree(response.body().string());
             
-            // Extract the summary text from the response
-            // This needs to be adapted based on the specific LLM API being used
-            String summary = responseJson.path("choices").get(0).path("text").asText();
+            // Extract the summary text from the OpenAI response
+            String summary = responseJson.path("choices").get(0).path("message").path("content").asText();
             
             return summary;
         }

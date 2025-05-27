@@ -4,6 +4,7 @@ import com.webex.summarizer.api.WebExMessageService;
 import com.webex.summarizer.api.WebExRoomService;
 import com.webex.summarizer.auth.WebExAuthenticator;
 import com.webex.summarizer.model.Conversation;
+import com.webex.summarizer.model.Message;
 import com.webex.summarizer.model.Room;
 import com.webex.summarizer.storage.ConversationStorage;
 import com.webex.summarizer.summarizer.LlmSummarizer;
@@ -18,6 +19,7 @@ import picocli.CommandLine.Parameters;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.ExecutionException;
@@ -50,6 +52,9 @@ public class WebExSummarizerCli implements Runnable {
     
     @Option(names = {"-s", "--summarize"}, description = "Generate summary for the downloaded conversation")
     private boolean summarize = false;
+    
+@Option(names = {"--read"}, description = "Read conversation without summarizing")
+    private boolean readOnly = false;
     
     @Option(names = {"--list-files"}, description = "List downloaded conversation files")
     private boolean listFiles = false;
@@ -91,6 +96,8 @@ public class WebExSummarizerCli implements Runnable {
             } else if (filePath != null && summarize) {
                 initApiClients();
                 summarizeExistingConversation(filePath);
+            } else if (filePath != null && readOnly) {
+                readConversation(filePath);
             } else {
                 System.out.println("No command specified. Use --help for usage information.");
             }
@@ -101,20 +108,18 @@ public class WebExSummarizerCli implements Runnable {
     }
     
     private void initApiClients() throws IOException {
-        String clientId = configLoader.getProperty("webex.client.id");
-        String clientSecret = configLoader.getProperty("webex.client.secret");
-        String redirectUri = configLoader.getProperty("webex.redirect.uri");
-        
-        authenticator = new WebExAuthenticator(clientId, clientSecret, redirectUri);
-        
-        // Load access token from config
-        String accessToken = configLoader.getProperty("webex.access.token");
-        if (accessToken == null || accessToken.isEmpty()) {
-            throw new IOException("No access token found. Please authenticate first using --auth.");
+        // Load token directly from config
+        String token = configLoader.getProperty("webex.token");
+        if (token == null || token.isEmpty()) {
+            // Try fallback to old property name for backward compatibility
+            token = configLoader.getProperty("webex.access.token");
+            if (token == null || token.isEmpty()) {
+                throw new IOException("No WebEx token found. Please set webex.token in config.properties.");
+            }
         }
         
-        // Set token in authenticator
-        authenticator.setAccessToken(accessToken);
+        // Initialize authenticator with token
+        authenticator = new WebExAuthenticator(token);
         
         // Initialize API services
         roomService = new WebExRoomService(authenticator);
@@ -130,30 +135,21 @@ public class WebExSummarizerCli implements Runnable {
     
     private void performAuthentication() {
         try {
-            String clientId = configLoader.getProperty("webex.client.id");
-            String clientSecret = configLoader.getProperty("webex.client.secret");
-            String redirectUri = configLoader.getProperty("webex.redirect.uri");
-            
-            authenticator = new WebExAuthenticator(clientId, clientSecret, redirectUri);
-            
-            System.out.println("Please open the following URL in your browser:");
-            System.out.println(authenticator.getAuthorizationUrl());
-            System.out.println("\nAfter authorization, you will be redirected to an error page (since no server is running).");
-            System.out.println("Copy the 'code' parameter from the URL in your browser address bar.");
-            System.out.println("It will look like: http://localhost:8080/callback?code=COPY_THIS_CODE");
-            System.out.println("\nPlease enter just the code value here:");
-            
+            System.out.println("Enter your WebEx token:");
             Scanner scanner = new Scanner(System.in);
-            String code = scanner.nextLine().trim();
+            String token = scanner.nextLine().trim();
             
-            authenticator.handleCallback(code);
+            if (token == null || token.isEmpty()) {
+                System.err.println("Error: Token cannot be empty");
+                return;
+            }
             
             // Save the token in the config
-            configLoader.setProperty("webex.access.token", authenticator.getAccessToken());
+            configLoader.setProperty("webex.token", token);
             configLoader.saveProperties();
             
-            System.out.println("Authentication successful. Token saved.");
-        } catch (IOException | InterruptedException | ExecutionException e) {
+            System.out.println("Token saved successfully.");
+        } catch (Exception e) {
             logger.error("Authentication error: {}", e.getMessage(), e);
             System.err.println("Authentication error: " + e.getMessage());
         }
@@ -161,7 +157,7 @@ public class WebExSummarizerCli implements Runnable {
     
     private void saveDirectToken() {
         try {
-            configLoader.setProperty("webex.access.token", token);
+            configLoader.setProperty("webex.token", token);
             configLoader.saveProperties();
             System.out.println("Token saved successfully.");
         } catch (Exception e) {
@@ -239,6 +235,40 @@ public class WebExSummarizerCli implements Runnable {
         } catch (IOException e) {
             logger.error("Failed to summarize conversation: {}", e.getMessage(), e);
             System.err.println("Failed to summarize conversation: " + e.getMessage());
+        }
+    }
+    
+    private void readConversation(String filePath) {
+        try {
+            if (!Paths.get(filePath).toFile().exists()) {
+                System.err.println("File not found: " + filePath);
+                return;
+            }
+            
+            System.out.println("Loading conversation from " + filePath);
+            Conversation conversation = storage.loadConversation(filePath);
+            
+            System.out.println("\n=== CONVERSATION MESSAGES ===");
+            System.out.println("Room: " + conversation.getRoom().getTitle());
+            System.out.println("Messages: " + conversation.getMessages().size());
+            System.out.println("Download Date: " + conversation.getDownloadDate());
+            System.out.println("\n");
+            
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            for (Message message : conversation.getMessages()) {
+                System.out.println("[" + message.getCreated().format(formatter) + "] " + 
+                                   message.getPersonEmail() + ": " + message.getText());
+                System.out.println("-----");
+            }
+            
+            // If a summary exists, display it too
+            if (conversation.getSummary() != null && !conversation.getSummary().isEmpty()) {
+                System.out.println("\n=== SUMMARY ===");
+                System.out.println(conversation.getSummary());
+            }
+        } catch (IOException e) {
+            logger.error("Failed to read conversation: {}", e.getMessage(), e);
+            System.err.println("Failed to read conversation: " + e.getMessage());
         }
     }
     

@@ -14,6 +14,7 @@ public class Message {
     private String html;
     private ZonedDateTime created;
     private List<Attachment> attachments;
+    private String roomType;
     
     public static class Attachment {
         private String contentType;
@@ -115,5 +116,13 @@ public class Message {
 
     public void setAttachments(List<Attachment> attachments) {
         this.attachments = attachments;
+    }
+    
+    public String getRoomType() {
+        return roomType;
+    }
+
+    public void setRoomType(String roomType) {
+        this.roomType = roomType;
     }
 }

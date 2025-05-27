@@ -2,6 +2,8 @@ package com.webex.summarizer.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.webex.summarizer.auth.WebExAuthenticator;
 import com.webex.summarizer.model.Room;
 import okhttp3.OkHttpClient;
@@ -27,6 +29,8 @@ public class WebExRoomService {
         this.authenticator = authenticator;
         this.httpClient = new OkHttpClient();
         this.objectMapper = new ObjectMapper();
+        this.objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        this.objectMapper.registerModule(new JavaTimeModule());
     }
     
     public List<Room> listRooms() throws IOException {

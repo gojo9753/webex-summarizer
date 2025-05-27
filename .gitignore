@@ -1,0 +1,7 @@
+/config.properties
+/target
+/conversations
+.idea
+.claude
+/logs
+webex-summarizer.iml

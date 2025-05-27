@@ -9,6 +9,7 @@ public class Room {
     private String teamId;
     private ZonedDateTime created;
     private String creatorId;
+    private Boolean isLocked;
 
     public String getId() {
         return id;
@@ -56,5 +57,13 @@ public class Room {
 
     public void setCreatorId(String creatorId) {
         this.creatorId = creatorId;
+    }
+    
+    public Boolean getIsLocked() {
+        return isLocked;
+    }
+
+    public void setIsLocked(Boolean isLocked) {
+        this.isLocked = isLocked;
     }
 }

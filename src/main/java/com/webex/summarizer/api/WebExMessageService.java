@@ -36,6 +36,7 @@ public class WebExMessageService {
         this.httpClient = new OkHttpClient();
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
+        this.objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     }
     
     public Conversation downloadConversation(String roomId) throws IOException {
