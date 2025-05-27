@@ -126,11 +126,7 @@ public class WebExSummarizerCli implements Callable<Integer> {
         // Load token directly from config
         String token = configLoader.getProperty("webex.token");
         if (token == null || token.isEmpty()) {
-            // Try fallback to old property name for backward compatibility
-            token = configLoader.getProperty("webex.access.token");
-            if (token == null || token.isEmpty()) {
-                throw new IOException("No WebEx token found. Please set webex.token in config.properties.");
-            }
+            throw new IOException("No WebEx token found. Please set webex.token in config.properties.");
         }
         
         // Initialize authenticator with token

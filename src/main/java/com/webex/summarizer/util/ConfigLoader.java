@@ -40,12 +40,14 @@ public class ConfigLoader {
     }
     
     private void createDefaultConfig() {
-        properties.setProperty("webex.client.id", "YOUR_CLIENT_ID");
-        properties.setProperty("webex.client.secret", "YOUR_CLIENT_SECRET");
-        properties.setProperty("webex.redirect.uri", "http://localhost:8080/callback");
+        // WebEx config (only token needed with new simplified auth)
+        properties.setProperty("webex.token", "YOUR_WEBEX_TOKEN");
         properties.setProperty("storage.directory", "conversations");
-        properties.setProperty("llm.api.endpoint", "https://api.openai.com/v1/completions");
-        properties.setProperty("llm.api.key", "YOUR_LLM_API_KEY");
+        
+        // AWS Bedrock config
+        properties.setProperty("aws.profile", "default");
+        properties.setProperty("aws.region", "us-east-1");
+        properties.setProperty("aws.bedrock.model", "anthropic.claude-v2");
         
         saveProperties();
     }
