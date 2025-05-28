@@ -21,9 +21,9 @@ public class LlmSummarizer {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     
     // Constants for chunking and summarization
-    private static final int MAX_MESSAGES_PER_CHUNK = 500; // Maximum number of messages in each chunk
-    private static final int ESTIMATED_CHARS_PER_MESSAGE = 200; // Average estimated characters per message
-    private static final int MAX_CHUNK_SIZE_CHARS = 100000; // Maximum characters for a single chunk to stay under token limits
+    private static final int MAX_TOKENS_PER_CHUNK = 15000; // Maximum tokens in each chunk (to stay within context limits for most models)
+    private static final int TOKENS_PER_CHARACTER = 4; // Approximate ratio of characters to tokens (1 token ~= 4 chars in English)
+    private static final int CHUNK_BUFFER_TOKENS = 1000; // Buffer tokens for formatting, system messages, etc.
     
     private final BedrockClient bedrockClient;
     private SummarizationProgressListener progressListener;
@@ -58,17 +58,43 @@ public class LlmSummarizer {
         
         logger.info("Starting summarization for conversation with {} messages", messageCount);
         
-        // For small conversations, use single summarization
-        if (messageCount <= MAX_MESSAGES_PER_CHUNK) {
-            logger.info("Conversation is small enough for direct summarization");
+        // Calculate total token count for the conversation
+        int estimatedTokens = calculateTotalTokens(messages);
+        int maxTokensPerChunkWithBuffer = MAX_TOKENS_PER_CHUNK - CHUNK_BUFFER_TOKENS;
+        
+        logger.info("Estimated token count for conversation: {}", estimatedTokens);
+        
+        // For small conversations (token-wise), use single summarization
+        if (estimatedTokens <= maxTokensPerChunkWithBuffer) {
+            logger.info("Conversation is small enough for direct summarization ({} tokens)", estimatedTokens);
             reportProgress(1, 1, "Processing full conversation");
             String conversationText = formatConversation(conversation);
             return generateSingleSummary(conversationText, roomTitle);
         }
         
         // For large conversations, use chunked summarization
-        logger.info("Large conversation detected, using chunked summarization approach");
+        logger.info("Large conversation detected ({} tokens), using chunked summarization approach", estimatedTokens);
         return generateChunkedSummary(messages, roomTitle);
+    }
+    
+    /**
+     * Calculates the estimated token count for a list of messages
+     */
+    private int calculateTotalTokens(List<Message> messages) {
+        int totalTokens = 0;
+        
+        for (Message message : messages) {
+            String text = message.getText();
+            if (text != null) {
+                // Count tokens based on characters (approximate)
+                totalTokens += text.length() / TOKENS_PER_CHARACTER;
+                
+                // Add tokens for message metadata (timestamp, sender)
+                totalTokens += 20; // Approximate tokens for metadata
+            }
+        }
+        
+        return totalTokens;
     }
     
     /**
@@ -107,11 +133,14 @@ public class LlmSummarizer {
                               "Be thorough in capturing all important information as this will be combined with summaries of other parts.\n\n" + 
                               chunkText;
             
-            logger.info("Generating summary for chunk {} of {} ({} messages)", 
-                       i + 1, messageChunks.size(), chunk.size());
+            int chunkTokens = calculateTotalTokens(chunk);
+            logger.info("Generating summary for chunk {} of {} ({} messages, ~{} tokens)", 
+                       i + 1, messageChunks.size(), chunk.size(), chunkTokens);
             String chunkSummary = bedrockClient.generateText(chunkPrompt);
             chunkSummaries.add(chunkSummary);
-            logger.info("Chunk {} summary generated ({} characters)", i + 1, chunkSummary.length());
+            int summaryTokens = chunkSummary.length() / TOKENS_PER_CHARACTER;
+            logger.info("Chunk {} summary generated ({} characters, ~{} tokens)", 
+                       i + 1, chunkSummary.length(), summaryTokens);
         }
         
         // Generate final summary from all chunk summaries
@@ -120,37 +149,65 @@ public class LlmSummarizer {
     }
     
     /**
-     * Calculate how many chunks are needed based on message count and estimated sizes
+     * Calculate how many chunks are needed based on token counts
      */
-    private int calculateChunkCount(List<Message> messages) {
-        int messageCount = messages.size();
+    protected int calculateChunkCount(List<Message> messages) {
+        int totalTokens = calculateTotalTokens(messages);
+        int maxTokensPerChunkWithBuffer = MAX_TOKENS_PER_CHUNK - CHUNK_BUFFER_TOKENS;
         
-        // Estimate total character count
-        long totalEstimatedChars = 0;
-        for (Message message : messages) {
-            String text = message.getText();
-            totalEstimatedChars += (text != null) ? text.length() : 0;
-        }
-        
-        // Calculate based on either raw message count or estimated character count
-        int chunksByMessageCount = (int) Math.ceil((double) messageCount / MAX_MESSAGES_PER_CHUNK);
-        int chunksByCharCount = (int) Math.ceil((double) totalEstimatedChars / MAX_CHUNK_SIZE_CHARS);
-        
-        // Take the larger value to ensure chunks aren't too big
-        return Math.max(chunksByMessageCount, chunksByCharCount);
+        // Calculate chunks needed based on total tokens
+        return (int) Math.ceil((double) totalTokens / maxTokensPerChunkWithBuffer);
     }
     
     /**
-     * Split the list of messages into roughly equal-sized chunks
+     * Split the list of messages into chunks based on token counts
      */
     private List<List<Message>> splitMessagesIntoChunks(List<Message> messages, int chunkCount) {
         List<List<Message>> chunks = new ArrayList<>();
-        int messagesPerChunk = (int) Math.ceil((double) messages.size() / chunkCount);
+        int maxTokensPerChunk = MAX_TOKENS_PER_CHUNK - CHUNK_BUFFER_TOKENS;
         
-        for (int i = 0; i < chunkCount; i++) {
-            int startIndex = i * messagesPerChunk;
-            int endIndex = Math.min(startIndex + messagesPerChunk, messages.size());
-            chunks.add(messages.subList(startIndex, endIndex));
+        // If we only need one chunk but method was called, return all messages as one chunk
+        if (chunkCount <= 1) {
+            chunks.add(new ArrayList<>(messages));
+            return chunks;
+        }
+        
+        List<Message> currentChunk = new ArrayList<>();
+        int currentChunkTokens = 0;
+        
+        for (Message message : messages) {
+            // Calculate tokens for this message
+            int messageTokens = 0;
+            if (message.getText() != null) {
+                messageTokens = message.getText().length() / TOKENS_PER_CHARACTER + 20; // text + metadata
+            }
+            
+            // If adding this message would exceed the chunk token limit and current chunk is not empty
+            // then finalize the current chunk and start a new one
+            if (currentChunkTokens + messageTokens > maxTokensPerChunk && !currentChunk.isEmpty()) {
+                chunks.add(new ArrayList<>(currentChunk));
+                currentChunk.clear();
+                currentChunkTokens = 0;
+            }
+            
+            // Add the message to the current chunk
+            currentChunk.add(message);
+            currentChunkTokens += messageTokens;
+            
+            // Special case: if a single message exceeds the chunk token limit
+            // it will be the only message in its chunk
+        }
+        
+        // Add the final chunk if it's not empty
+        if (!currentChunk.isEmpty()) {
+            chunks.add(currentChunk);
+        }
+        
+        logger.info("Split conversation into {} token-based chunks", chunks.size());
+        for (int i = 0; i < chunks.size(); i++) {
+            int chunkTokens = calculateTotalTokens(chunks.get(i));
+            logger.debug("Chunk {} contains {} messages with ~{} tokens", 
+                      i + 1, chunks.get(i).size(), chunkTokens);
         }
         
         return chunks;

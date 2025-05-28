@@ -224,12 +224,13 @@ java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summari
 
 The summarize command automatically handles large conversations by:
 
-1. Intelligently splitting messages into manageable chunks
-2. Summarizing each chunk individually
-3. Combining all chunk summaries into a coherent final summary
-4. Displaying progress with a visual progress bar
+1. Intelligently analyzing message content and estimating token usage
+2. Splitting conversations into optimally-sized chunks based on token counts
+3. Processing each chunk individually while monitoring token limits
+4. Combining all chunk summaries into a coherent final summary
+5. Displaying progress with a visual progress bar
 
-This ensures that even conversations with thousands of messages can be summarized effectively while staying within LLM token limits.
+This ensures that even conversations with thousands of messages or very large individual messages can be summarized effectively while staying within LLM token limits. The system automatically adjusts chunking based on actual message content instead of just message counts.
 
 ### List Available Bedrock Models
 
@@ -293,6 +294,13 @@ To contribute to the project:
 - Support for legacy API (Claude v2, Titan, Llama) and newer Messages API (Claude 3+)
 - Compatible with the latest Claude models including us.anthropic.claude-sonnet-4-20250514-v1:0
 - Enhanced summarization quality with modern models
+
+### Token-based Chunking
+- Intelligently estimates token usage for each message
+- Splits conversations based on actual content size rather than message count
+- Ensures that each chunk stays below model context limits (15,000 tokens by default)
+- Handles large individual messages by placing them in their own chunks
+- Dynamically adjusts chunking strategy based on conversation characteristics
 
 ## License
 
