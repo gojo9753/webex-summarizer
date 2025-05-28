@@ -21,9 +21,9 @@ public class LlmSummarizer {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     
     // Constants for chunking and summarization
-    private static final int MAX_MESSAGES_PER_CHUNK = 100; // Maximum number of messages in each chunk
+    private static final int MAX_MESSAGES_PER_CHUNK = 500; // Maximum number of messages in each chunk
     private static final int ESTIMATED_CHARS_PER_MESSAGE = 200; // Average estimated characters per message
-    private static final int MAX_CHUNK_SIZE_CHARS = 15000; // Maximum characters for a single chunk to stay under token limits
+    private static final int MAX_CHUNK_SIZE_CHARS = 100000; // Maximum characters for a single chunk to stay under token limits
     
     private final BedrockClient bedrockClient;
     private SummarizationProgressListener progressListener;
