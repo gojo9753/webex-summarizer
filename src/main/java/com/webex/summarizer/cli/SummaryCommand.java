@@ -7,6 +7,7 @@ import com.webex.summarizer.model.Conversation;
 import com.webex.summarizer.storage.ConversationStorage;
 import com.webex.summarizer.summarizer.LlmSummarizer;
 import com.webex.summarizer.util.ConfigLoader;
+import com.webex.summarizer.util.SummaryFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -206,96 +207,7 @@ public class SummaryCommand implements Callable<Integer> {
      * Format and display a summary with enhanced visual presentation
      */
     private void displayFormattedSummary(String summary) {
-        // Add current timestamp to the header
-        String currentTime = java.time.LocalDateTime.now()
-                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-        
-        // Display the summary with improved formatting and timestamp
-        System.out.println("╔══════════════════════════════════════════════════════════════════════════════╗");
-        System.out.println("║                       CONVERSATION SUMMARY                                 ║");
-        System.out.println("╠══════════════════════════════════════════════════════════════════════════════╣");
-        System.out.println("║  Generated: " + currentTime + "                                     ║");
-        System.out.println("╚══════════════════════════════════════════════════════════════════════════════╝");
-        
-        // Process and print each line of the summary with enhanced formatting
-        String[] summaryLines = summary.split("\n");
-        boolean inActionItems = false;
-        boolean inDecisions = false;
-        
-        for (String line : summaryLines) {
-            if (line.trim().isEmpty()) {
-                System.out.println(); // preserve empty lines
-            } else if (line.trim().startsWith("**") && line.trim().endsWith("**")) {
-                // Track which section we're in for special formatting
-                String headerContent = line.trim().replaceAll("\\*\\*", "");
-                inActionItems = headerContent.toLowerCase().contains("action") || 
-                               headerContent.toLowerCase().contains("task");
-                inDecisions = headerContent.toLowerCase().contains("decision") ||
-                             headerContent.toLowerCase().contains("conclusion");
-                
-                // Create a more visually distinctive section header
-                String decoration = getHeaderDecoration(headerContent);
-                System.out.println();
-                System.out.println(decoration);
-                System.out.println("┏━━━━━━" + "━".repeat(headerContent.length()) + "━━━━━┓");
-                System.out.println("┃  " + headerContent.toUpperCase() + "  ┃");
-                System.out.println("┗━━━━━━" + "━".repeat(headerContent.length()) + "━━━━━┛");
-                System.out.println(decoration);
-            } else if (line.trim().startsWith("---")) {
-                // Separator lines - convert to a nicer format with different styles
-                System.out.println("  ∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙");
-            } else if (line.trim().matches("^\\d+\\..*")) {
-                // Numbered items with enhanced formatting based on section
-                String number = line.trim().split("\\.", 2)[0];
-                String content = line.trim().substring(number.length() + 1).trim();
-                
-                if (inActionItems) {
-                    // Action items get a distinctive marker and formatting
-                    System.out.println("  ➤ " + number + ". " + content);
-                } else if (inDecisions) {
-                    // Decisions get a different marker
-                    System.out.println("  ✓ " + number + ". " + content);
-                } else {
-                    // Regular numbered items
-                    System.out.println("  • " + number + ". " + content);
-                }
-            } else {
-                // Regular text with context-aware indentation
-                if (inActionItems && line.trim().toLowerCase().contains("by:") || 
-                    line.trim().toLowerCase().contains("owner:") ||
-                    line.trim().toLowerCase().contains("due:")) {
-                    // Highlight ownership and deadlines in action items
-                    System.out.println("      ↳ " + line.trim());
-                } else {
-                    // Standard indentation for regular text
-                    System.out.println("    " + line);
-                }
-            }
-        }
-        
-        // Add footer with legend for markers
-        System.out.println("\n" + "═".repeat(76));
-        System.out.println(" Legend:  • Regular Point   ➤ Action Item   ✓ Decision");
-        System.out.println("═".repeat(76));
-    }
-    
-    /**
-     * Get decorative line based on section header content
-     */
-    private String getHeaderDecoration(String headerContent) {
-        if (headerContent.toLowerCase().contains("overview")) {
-            return "┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅";
-        } else if (headerContent.toLowerCase().contains("action") || 
-                  headerContent.toLowerCase().contains("task")) {
-            return "⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥⬥";
-        } else if (headerContent.toLowerCase().contains("decision") ||
-                  headerContent.toLowerCase().contains("conclusion")) {
-            return "◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈◈";
-        } else if (headerContent.toLowerCase().contains("key")) {
-            return "▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪";
-        } else {
-            return "────────────────────────────────────────────────────────────────────────────";
-        }
+        SummaryFormatter.printFormattedSummary(summary);
     }
     
     private void listSummariesAction(ConversationStorage storage) throws IOException {
