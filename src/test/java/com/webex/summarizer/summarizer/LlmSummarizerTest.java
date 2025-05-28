@@ -12,8 +12,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
 
 /**
  * Test class for LlmSummarizer.
@@ -23,13 +21,6 @@ public class LlmSummarizerTest {
 
     @Test
     public void testProgressReporting() throws Exception {
-        // Create a mock BedrockClient
-        BedrockClient mockClient = mock(BedrockClient.class);
-        when(mockClient.generateText(anyString())).thenReturn("Mock summary");
-        
-        // Create a mock progress listener
-        LlmSummarizer.SummarizationProgressListener mockListener = mock(LlmSummarizer.SummarizationProgressListener.class);
-        
         // Create test data - a conversation with messages
         Room room = new Room();
         room.setId("test-room-id");
@@ -49,42 +40,60 @@ public class LlmSummarizerTest {
         conversation.setRoom(room);
         conversation.setMessages(messages);
         
-        // Set up mock response for single summary
-        when(mockClient.generateText(anyString())).thenReturn("Test summary");
+        // Create a test implementation of progress listener that records calls
+        List<String> progressUpdates = new ArrayList<>();
+        LlmSummarizer.SummarizationProgressListener testListener = 
+            (current, total, status) -> progressUpdates.add(current + "/" + total + ": " + status);
         
-        // Create summarizer with reflection to inject mock client
+        // Create a test implementation of BedrockClient
+        BedrockClient testClient = new TestBedrockClient("Test summary");
+        
+        // Create summarizer with reflection to inject test client
         LlmSummarizer summarizer = new LlmSummarizer("default", "us-east-1", "anthropic.claude-v2");
         
         // Use reflection to replace the client
         java.lang.reflect.Field clientField = LlmSummarizer.class.getDeclaredField("bedrockClient");
         clientField.setAccessible(true);
-        clientField.set(summarizer, mockClient);
+        clientField.set(summarizer, testClient);
         
         // Set the progress listener
-        summarizer.setProgressListener(mockListener);
+        summarizer.setProgressListener(testListener);
         
         // Call the method under test
         String result = summarizer.generateSummary(conversation);
         
-        // Verify the interaction with the progress listener
-        verify(mockListener).onSummarizationProgress(1, 1, "Processing full conversation");
+        // Verify the progress listener was called
+        assertTrue(progressUpdates.contains("1/1: Processing full conversation"), 
+                  "Progress listener should be called with correct parameters");
         
         // Verify the result
         assertEquals("Test summary", result);
     }
     
+    // Simple test implementation that avoids Mockito
+    private static class TestBedrockClient extends BedrockClient {
+        private final String responseText;
+        
+        public TestBedrockClient(String responseText) {
+            super("default", "us-east-1", "anthropic.claude-v2");
+            this.responseText = responseText;
+        }
+        
+        @Override
+        public String generateText(String prompt) {
+            return responseText;
+        }
+    }
+    
     @Test
     public void testGenerateChunkedSummary() throws Exception {
-        // Create a mock BedrockClient
-        BedrockClient mockClient = mock(BedrockClient.class);
-        
         // Create test data - a large conversation with many messages
         Room room = new Room();
         room.setId("test-room-id");
         room.setTitle("Test Room");
         
         List<Message> messages = new ArrayList<>();
-        for (int i = 0; i < 150; i++) { // More than MAX_MESSAGES_PER_CHUNK
+        for (int i = 0; i < 1001; i++) { // More than MAX_MESSAGES_PER_CHUNK (500)
             Message message = new Message();
             message.setId("msg-" + i);
             message.setPersonEmail("user" + i + "@example.com");
@@ -97,28 +106,52 @@ public class LlmSummarizerTest {
         conversation.setRoom(room);
         conversation.setMessages(messages);
         
-        // Set up mock response for chunk summaries
-        when(mockClient.generateText(anyString())).thenReturn("Chunk summary");
+        // Track calls to BedrockClient.generateText
+        List<String> generatedTexts = new ArrayList<>();
         
-        // Create summarizer with reflection to inject mock client
+        // Create a test implementation of BedrockClient that records calls
+        class TracingBedrockClient extends BedrockClient {
+            public TracingBedrockClient() {
+                super("default", "us-east-1", "anthropic.claude-v2");
+            }
+            
+            @Override
+            public String generateText(String prompt) {
+                generatedTexts.add(prompt.substring(0, Math.min(50, prompt.length())));
+                return "Chunk summary";
+            }
+        }
+        
+        TracingBedrockClient testClient = new TracingBedrockClient();
+        
+        // Record progress updates
+        List<String> progressUpdates = new ArrayList<>();
+        LlmSummarizer.SummarizationProgressListener testListener = 
+            (current, total, status) -> progressUpdates.add(current + "/" + total + ": " + status);
+        
+        // Create summarizer with reflection to inject test client
         LlmSummarizer summarizer = new LlmSummarizer("default", "us-east-1", "anthropic.claude-v2");
         
         // Use reflection to replace the client
         java.lang.reflect.Field clientField = LlmSummarizer.class.getDeclaredField("bedrockClient");
         clientField.setAccessible(true);
-        clientField.set(summarizer, mockClient);
+        clientField.set(summarizer, testClient);
         
-        // Create a mock progress listener
-        LlmSummarizer.SummarizationProgressListener mockListener = mock(LlmSummarizer.SummarizationProgressListener.class);
-        summarizer.setProgressListener(mockListener);
+        // Set the progress listener
+        summarizer.setProgressListener(testListener);
         
         // Call the method under test
         String result = summarizer.generateSummary(conversation);
         
         // Verify the generateText method was called more than once (for each chunk and final summary)
-        verify(mockClient, atLeast(2)).generateText(anyString());
+        assertTrue(generatedTexts.size() >= 2, 
+                 "Should have generated at least 2 texts (chunks + final)");
         
-        // Verify progress listener was called
-        verify(mockListener, atLeast(2)).onSummarizationProgress(anyInt(), anyInt(), anyString());
+        // Verify progress listener was called multiple times
+        assertTrue(progressUpdates.size() >= 2,
+                 "Should have reported progress at least twice (for each chunk)");
+        
+        // Verify the result
+        assertEquals("Chunk summary", result);
     }
 }
