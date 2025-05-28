@@ -54,7 +54,7 @@ public class WebExMessageService {
                     .addQueryParameter("roomId", roomId)
                     .addQueryParameter("max", String.valueOf(MAX_MESSAGES_PER_REQUEST));
 
-            // Add beforeMessage parameter for pagination if we have an oldest message
+            // Add beforeMessage parameter for pagination if we have the oldest message
             if (oldestMessageId != null) {
                 urlBuilder.addQueryParameter("beforeMessage", oldestMessageId);
             }
