@@ -41,13 +41,18 @@ public class BedrockClient {
         ProfileCredentialsProvider credentialsProvider = ProfileCredentialsProvider.builder()
                 .profileName(awsProfile)
                 .build();
-                
+        
+        // Configure client with extended timeouts for working with large conversations
         this.runtimeClient = BedrockRuntimeClient.builder()
                 .region(awsRegion)
                 .credentialsProvider(credentialsProvider)
+                .overrideConfiguration(config -> 
+                    config.apiCallTimeout(java.time.Duration.ofMinutes(5))
+                         .apiCallAttemptTimeout(java.time.Duration.ofMinutes(5)))
                 .build();
                 
-        logger.info("AWS Bedrock runtime client initialized with profile: {} and region: {}", awsProfile, awsRegion);
+        logger.info("AWS Bedrock runtime client initialized with profile: {} and region: {} (timeout: 5 minutes)",
+                   awsProfile, awsRegion);
     }
     
     public List<Map<String, String>> listAvailableModels() {

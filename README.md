@@ -5,11 +5,12 @@ A Java application for downloading conversations from Cisco WebEx rooms and gene
 ## Features
 
 - **WebEx Authentication**: Simple token-based authentication with the Cisco WebEx API
-- **Room Selection**: Download conversations from specific WebEx rooms
+- **Room Management**: List, filter, and access details of WebEx rooms
+- **Message Management**: Download, display, and organize messages from WebEx rooms
 - **Pagination Support**: Automatically handles paginated API responses to retrieve all messages
 - **Local Storage**: Store downloaded conversations in structured JSON format
-- **Conversation Summarization**: Generate concise summaries of conversations using AWS Bedrock's LLMs
-- **Command-line Interface**: Simple CLI for all operations
+- **Conversation Summarization**: Generate concise summaries of conversations using AWS Bedrock's LLMs, with support for processing large conversations through intelligent chunking
+- **Command-line Interface**: Simple CLI for all operations with dedicated subcommands
 - **AWS Integration**: Uses AWS SDK and credentials for secure access to Bedrock models
 
 ## Requirements
@@ -131,6 +132,85 @@ Generate a summary for a previously downloaded conversation:
 ```
 java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -s path/to/conversation/file.json
 ```
+
+For large conversations, the app will automatically split the conversation into manageable chunks, summarize each chunk, and then combine these summaries into a cohesive final summary. Progress indicators will show you the status of this multi-stage process.
+
+### New Subcommands for Room and Message Management
+
+#### List Rooms with Enhanced Options
+
+Use the dedicated room listing subcommand:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar list-rooms
+```
+
+Filter rooms by type:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar list-rooms --type group
+```
+
+View details for a specific room:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar list-rooms --id ROOM_ID
+```
+
+#### List Messages from a Room or File
+
+List messages from a WebEx room:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar list-messages --room ROOM_ID
+```
+
+List messages from a previously saved conversation file:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar list-messages --file path/to/conversation/file.json
+```
+
+Limit the number of messages shown:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar list-messages --room ROOM_ID --limit 50
+```
+
+Save the downloaded messages to a file:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar list-messages --room ROOM_ID --save
+```
+
+#### Manage Summaries
+
+Generate a summary from a WebEx room:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --room ROOM_ID
+```
+
+Summarize a previously downloaded conversation:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --file path/to/conversation/file.json
+```
+
+List all conversations with summaries:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --list-summaries
+```
+
+The summarize command automatically handles large conversations by:
+
+1. Intelligently splitting messages into manageable chunks
+2. Summarizing each chunk individually
+3. Combining all chunk summaries into a coherent final summary
+4. Displaying progress with a visual progress bar
+
+This ensures that even conversations with thousands of messages can be summarized effectively while staying within LLM token limits.
 
 ### List Available Bedrock Models
 
