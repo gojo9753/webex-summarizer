@@ -12,6 +12,7 @@ A Java application for downloading conversations from Cisco WebEx rooms and gene
 - **Conversation Summarization**: Generate concise summaries of conversations using AWS Bedrock's LLMs, with support for processing large conversations through intelligent chunking
 - **Command-line Interface**: Simple CLI for all operations with dedicated subcommands
 - **AWS Integration**: Uses AWS SDK and credentials for secure access to Bedrock models
+- **Modern LLM Support**: Compatible with the latest Claude models including us.anthropic.claude-sonnet-4-20250514-v1:0 using the newer Messages API
 
 ## Requirements
 
@@ -286,6 +287,12 @@ To contribute to the project:
 - Configurable page size (--limit parameter)
 - Navigation between pages (--page parameter)
 - Clear display of current page position and total pages
+
+### AWS Bedrock Integration
+- Intelligent model detection to use the appropriate API for each model type
+- Support for legacy API (Claude v2, Titan, Llama) and newer Messages API (Claude 3+)
+- Compatible with the latest Claude models including us.anthropic.claude-sonnet-4-20250514-v1:0
+- Enhanced summarization quality with modern models
 
 ## License
 
