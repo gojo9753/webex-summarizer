@@ -7,7 +7,7 @@ A Java application for downloading conversations from Cisco WebEx rooms and gene
 - **WebEx Authentication**: Simple token-based authentication with the Cisco WebEx API
 - **Room Management**: List, filter, and access details of WebEx rooms
 - **Message Management**: Download, display, and organize messages from WebEx rooms
-- **Pagination Support**: Automatically handles paginated API responses to retrieve all messages
+- **Enhanced Pagination Support**: Automatically handles paginated API responses to retrieve all messages, even for large rooms with thousands of messages
 - **Local Storage**: Store downloaded conversations in structured JSON format
 - **Conversation Summarization**: Generate concise summaries of conversations using AWS Bedrock's LLMs, with support for processing large conversations through intelligent chunking
 - **Command-line Interface**: Simple CLI for all operations with dedicated subcommands
@@ -125,6 +125,18 @@ Read a previously downloaded conversation without summarizing:
 java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar --read path/to/conversation/file.json
 ```
 
+With pagination and message references:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar --read path/to/conversation/file.json --limit 50 --page 1 --references
+```
+
+Options:
+- `--limit <number>`: Set the number of messages to display per page (default: 1000)
+- `--page <number>`: Select which page of messages to display (default: 1)
+- `--references`: Show message reference numbers and IDs (default: true)
+- `--no-references`: Hide message reference numbers and IDs
+
 ### Summarize an Existing Conversation
 
 Generate a summary for a previously downloaded conversation:
@@ -171,10 +183,10 @@ List messages from a previously saved conversation file:
 java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar list-messages --file path/to/conversation/file.json
 ```
 
-Limit the number of messages shown:
+With pagination and message references:
 
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar list-messages --room ROOM_ID --limit 50
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar list-messages --room ROOM_ID --limit 50 --page 2 --references
 ```
 
 Save the downloaded messages to a file:
@@ -182,6 +194,12 @@ Save the downloaded messages to a file:
 ```
 java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar list-messages --room ROOM_ID --save
 ```
+
+Advanced Options:
+- `--limit <number>`: Set the number of messages to display per page (default: 1000)
+- `--page <number>`: Select which page of messages to display (default: 1)
+- `--references`: Show message reference numbers and IDs (default: true)
+- `--no-references`: Hide message reference numbers and IDs
 
 #### Manage Summaries
 
@@ -251,6 +269,23 @@ To contribute to the project:
 2. Create a feature branch
 3. Make your changes
 4. Submit a pull request
+
+## Technical Details
+
+### WebEx API Integration
+- Uses the WebEx Messages API with 'beforeMessage' parameter for efficient pagination
+- Reliably handles rooms with thousands of messages
+- Compares returned message counts with requested counts to detect end of message history
+
+### Message References
+- All messages have unique reference numbers (#0001, #0002, etc.)
+- Original WebEx message IDs are preserved and displayed
+- Reference system works across pagination boundaries
+
+### Pagination
+- Configurable page size (--limit parameter)
+- Navigation between pages (--page parameter)
+- Clear display of current page position and total pages
 
 ## License
 

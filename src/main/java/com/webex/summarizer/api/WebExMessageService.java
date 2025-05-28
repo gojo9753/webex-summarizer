@@ -46,17 +46,17 @@ public class WebExMessageService {
         
         Room room = roomService.getRoom(roomId);
         List<Message> allMessages = new ArrayList<>();
-        String nextLink = null;
+        String oldestMessageId = null;
         boolean hasMore = true;
         
         while (hasMore) {
-            HttpUrl.Builder urlBuilder;
-            if (nextLink == null) {
-                urlBuilder = HttpUrl.parse(API_BASE_URL + "/messages").newBuilder()
-                        .addQueryParameter("roomId", roomId)
-                        .addQueryParameter("max", String.valueOf(MAX_MESSAGES_PER_REQUEST));
-            } else {
-                urlBuilder = HttpUrl.parse(nextLink).newBuilder();
+            HttpUrl.Builder urlBuilder = HttpUrl.parse(API_BASE_URL + "/messages").newBuilder()
+                    .addQueryParameter("roomId", roomId)
+                    .addQueryParameter("max", String.valueOf(MAX_MESSAGES_PER_REQUEST));
+
+            // Add beforeMessage parameter for pagination if we have an oldest message
+            if (oldestMessageId != null) {
+                urlBuilder.addQueryParameter("beforeMessage", oldestMessageId);
             }
             
             Request request = new Request.Builder()
@@ -79,15 +79,23 @@ public class WebExMessageService {
                     messages.add(message);
                 }
                 
-                allMessages.addAll(messages);
-                logger.info("Downloaded {} messages", messages.size());
+                int messagesReceived = messages.size();
                 
-                // Check if there are more messages to fetch
-                if (rootNode.has("links") && rootNode.path("links").has("next")) {
-                    nextLink = rootNode.path("links").path("next").asText();
-                } else {
+                // Check if we got fewer messages than requested (indicating we're at the end)
+                // or if we got no messages
+                if (messagesReceived == 0 || messagesReceived < MAX_MESSAGES_PER_REQUEST) {
                     hasMore = false;
+                    logger.info("Reached end of messages with {} messages in this batch", messagesReceived);
+                } else if (!messages.isEmpty()) {
+                    // Get the ID of the oldest message for the next pagination request
+                    // Assuming messages are sorted by creation time in descending order
+                    oldestMessageId = messages.get(messages.size() - 1).getId();
+                    logger.info("Downloaded batch of {} messages, continuing with beforeMessage={}", 
+                              messagesReceived, oldestMessageId);
                 }
+                
+                allMessages.addAll(messages);
+                logger.info("Downloaded {} messages so far", allMessages.size());
             }
         }
         

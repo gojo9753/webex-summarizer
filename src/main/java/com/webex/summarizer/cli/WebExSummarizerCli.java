@@ -64,6 +64,15 @@ public class WebExSummarizerCli implements Callable<Integer> {
 @Option(names = {"--read"}, description = "Read conversation without summarizing")
     private boolean readOnly = false;
     
+    @Option(names = {"--page"}, description = "Page number to display (starting from 1)")
+    private Integer page = 1;
+    
+    @Option(names = {"--limit"}, description = "Maximum number of messages to display per page")
+    private Integer messagesPerPage = 1000;
+    
+    @Option(names = {"--references"}, description = "Show reference IDs for messages")
+    private boolean showReferences = true;
+    
     @Option(names = {"--list-files"}, description = "List downloaded conversation files")
     private boolean listFiles = false;
     
@@ -275,21 +284,59 @@ public class WebExSummarizerCli implements Callable<Integer> {
             System.out.println("Loading conversation from " + filePath);
             Conversation conversation = storage.loadConversation(filePath);
             
+            List<Message> allMessages = conversation.getMessages();
+            int totalMessages = allMessages.size();
+            
+            // Determine pagination parameters
+            int pageSize = messagesPerPage != null ? messagesPerPage : 1000;
+            int totalPages = (int) Math.ceil((double) totalMessages / pageSize);
+            
+            // Validate page number
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+            
+            // Calculate start and end indices for the current page
+            int startIndex = (page - 1) * pageSize;
+            int endIndex = Math.min(startIndex + pageSize, totalMessages);
+            
+            // Get messages for the current page
+            List<Message> pageMessages = allMessages.subList(startIndex, endIndex);
+            
             // Print conversation header with styling
             System.out.println("\n╔══════════════════════════════════════════════════════════════════════════════╗");
             System.out.println("║                         CONVERSATION MESSAGES                              ║");
             System.out.println("╚══════════════════════════════════════════════════════════════════════════════╝");
             System.out.println("Room: " + conversation.getRoom().getTitle());
-            System.out.println("Messages: " + conversation.getMessages().size());
+            System.out.println("Messages: " + pageMessages.size() + " of " + totalMessages + 
+                            " (Page " + page + " of " + totalPages + ")");
             System.out.println("Download Date: " + formatDateTime(conversation.getDownloadDate()));
+            
+            // Show pagination navigation help if there are multiple pages
+            if (totalPages > 1) {
+                System.out.println("");
+                System.out.println("Navigation:");
+                if (page > 1) {
+                    System.out.println("  Previous page: --page " + (page - 1));
+                }
+                if (page < totalPages) {
+                    System.out.println("  Next page: --page " + (page + 1));
+                }
+            }
+            
             System.out.println("");
             
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
             String currentDate = null;
             
             // Group messages by date for better readability
-            for (Message message : conversation.getMessages()) {
-                String messageDate = message.getCreated().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            for (int i = 0; i < pageMessages.size(); i++) {
+                Message message = pageMessages.get(i);
+                
+                // Calculate absolute message number across all pages
+                int messageNumber = startIndex + i + 1;
+                
+                String messageDate = message.getCreated().format(dateFormatter);
                 
                 // Print date header when day changes
                 if (currentDate == null || !currentDate.equals(messageDate)) {
@@ -299,9 +346,15 @@ public class WebExSummarizerCli implements Callable<Integer> {
                     System.out.println("└──────────────────────────────────────────────────────────────────────────────┘");
                 }
                 
-                // Show time and author with clear formatting
-                System.out.println("\n[" + message.getCreated().format(DateTimeFormatter.ofPattern("HH:mm:ss")) + "] " + 
-                                   formatSender(message.getPersonEmail()));
+                // Show reference ID, time and author with clear formatting
+                if (showReferences) {
+                    System.out.println("\n#" + formatMessageNumber(messageNumber) + " [" + 
+                                      message.getCreated().format(timeFormatter) + "] " + 
+                                      formatSender(message.getPersonEmail()));
+                } else {
+                    System.out.println("\n[" + message.getCreated().format(timeFormatter) + "] " + 
+                                      formatSender(message.getPersonEmail()));
+                }
                 
                 // Handle multiline message text with proper indentation
                 if (message.getText() != null) {
@@ -311,7 +364,23 @@ public class WebExSummarizerCli implements Callable<Integer> {
                     }
                 }
                 
+                // Add the message ID as a reference
+                if (showReferences) {
+                    System.out.println("    [ID: " + message.getId() + "]");
+                }
+                
                 System.out.println("────────────────────────────────────────────────────────────────────────────────");
+            }
+            
+            // Show pagination navigation help at the bottom too
+            if (totalPages > 1) {
+                System.out.println("\nPage " + page + " of " + totalPages);
+                if (page > 1) {
+                    System.out.println("Previous page: --page " + (page - 1));
+                }
+                if (page < totalPages) {
+                    System.out.println("Next page: --page " + (page + 1));
+                }
             }
             
             // If a summary exists, display it with enhanced formatting
@@ -364,6 +433,13 @@ public class WebExSummarizerCli implements Callable<Integer> {
         }
         
         return dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+    }
+    
+    /**
+     * Format message number with leading zeros for consistent width
+     */
+    private String formatMessageNumber(int number) {
+        return String.format("%04d", number);
     }
     
     /**

@@ -41,11 +41,17 @@ public class MessageListCommand implements Callable<Integer> {
     @Option(names = {"--file"}, description = "Path to a saved conversation file to display")
     private String filePath;
 
-    @Option(names = {"--limit"}, description = "Maximum number of messages to display")
-    private Integer limit;
+    @Option(names = {"--limit"}, description = "Maximum number of messages to display per page")
+    private Integer limit = 1000;
+    
+    @Option(names = {"--page"}, description = "Page number to display (starting from 1)")
+    private Integer page = 1;
     
     @Option(names = {"--save"}, description = "Save the downloaded conversation to file")
     private boolean saveToFile = false;
+    
+    @Option(names = {"--references"}, description = "Show reference IDs for messages", defaultValue = "true")
+    private boolean showReferences = true;
 
     @Override
     public Integer call() throws Exception {
@@ -109,27 +115,57 @@ public class MessageListCommand implements Callable<Integer> {
         }
     }
     
-    private void displayMessages(Conversation conversation, Integer limit) {
-        List<Message> messages = conversation.getMessages();
+    private void displayMessages(Conversation conversation, Integer messagesPerPage) {
+        List<Message> allMessages = conversation.getMessages();
+        int totalMessages = allMessages.size();
         
-        // Apply limit if specified
-        if (limit != null && limit > 0 && limit < messages.size()) {
-            messages = messages.subList(0, limit);
-        }
+        // Determine pagination parameters
+        int pageSize = (messagesPerPage != null && messagesPerPage > 0) ? messagesPerPage : 1000;
+        int totalPages = (int) Math.ceil((double) totalMessages / pageSize);
+        
+        // Validate page number
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+        
+        // Calculate start and end indices for the current page
+        int startIndex = (page - 1) * pageSize;
+        int endIndex = Math.min(startIndex + pageSize, totalMessages);
+        
+        // Get messages for the current page
+        List<Message> pageMessages = allMessages.subList(startIndex, endIndex);
         
         // Print conversation header with styling
         System.out.println("\n╔══════════════════════════════════════════════════════════════════════════════╗");
         System.out.println("║                         CONVERSATION MESSAGES                              ║");
         System.out.println("╚══════════════════════════════════════════════════════════════════════════════╝");
         System.out.println("Room: " + conversation.getRoom().getTitle());
-        System.out.println("Messages: " + messages.size() + " of " + conversation.getMessages().size());
+        System.out.println("Messages: " + pageMessages.size() + " of " + totalMessages + 
+                         " (Page " + page + " of " + totalPages + ")");
         System.out.println("Download Date: " + formatDateTime(conversation.getDownloadDate()));
+        
+        // Show pagination navigation help if there are multiple pages
+        if (totalPages > 1) {
+            System.out.println("");
+            System.out.println("Navigation:");
+            if (page > 1) {
+                System.out.println("  Previous page: --page " + (page - 1));
+            }
+            if (page < totalPages) {
+                System.out.println("  Next page: --page " + (page + 1));
+            }
+        }
+        
         System.out.println("");
         
         String currentDate = null;
         
         // Group messages by date for better readability
-        for (Message message : messages) {
+        for (int i = 0; i < pageMessages.size(); i++) {
+            Message message = pageMessages.get(i);
+            
+            // Calculate absolute message number across all pages
+            int messageNumber = startIndex + i + 1;
+            
             String messageDate = message.getCreated().format(DATE_FORMATTER);
             
             // Print date header when day changes
@@ -140,9 +176,15 @@ public class MessageListCommand implements Callable<Integer> {
                 System.out.println("└──────────────────────────────────────────────────────────────────────────────┘");
             }
             
-            // Show time and author with clear formatting
-            System.out.println("\n[" + message.getCreated().format(TIME_FORMATTER) + "] " + 
-                              formatSender(message.getPersonEmail()));
+            // Show reference ID, time and author with clear formatting
+            if (showReferences) {
+                System.out.println("\n#" + formatMessageNumber(messageNumber) + " [" + 
+                                  message.getCreated().format(TIME_FORMATTER) + "] " + 
+                                  formatSender(message.getPersonEmail()));
+            } else {
+                System.out.println("\n[" + message.getCreated().format(TIME_FORMATTER) + "] " + 
+                                  formatSender(message.getPersonEmail()));
+            }
             
             // Handle multiline message text with proper indentation
             if (message.getText() != null) {
@@ -152,8 +194,31 @@ public class MessageListCommand implements Callable<Integer> {
                 }
             }
             
+            // Add the message ID as a reference
+            if (showReferences) {
+                System.out.println("    [ID: " + message.getId() + "]");
+            }
+            
             System.out.println("────────────────────────────────────────────────────────────────────────────────");
         }
+        
+        // Show pagination navigation help at the bottom too
+        if (totalPages > 1) {
+            System.out.println("\nPage " + page + " of " + totalPages);
+            if (page > 1) {
+                System.out.println("Previous page: --page " + (page - 1));
+            }
+            if (page < totalPages) {
+                System.out.println("Next page: --page " + (page + 1));
+            }
+        }
+    }
+    
+    /**
+     * Format message number with leading zeros to ensure consistent width
+     */
+    private String formatMessageNumber(int number) {
+        return String.format("%04d", number);
     }
     
     /**
