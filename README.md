@@ -126,20 +126,22 @@ java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -r ROOM
 You can also summarize a downloaded conversation file with date filtering:
 
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --file path/to/conversation/file.json --start-date 2023-01-01
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --file "conversations/filename.json" --start-date 2023-01-01
 ```
 
 You can use alternative shorter parameter names:
 
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --file path/to/conversation/file.json --from 2023-01-01 --to 2023-01-31
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --file "conversations/filename.json" --from 2023-01-01 --to 2023-01-31
 ```
 
 Filter only messages from a specific date to current date:
 
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --file path/to/conversation/file.json --from 2023-01-01
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --file "conversations/filename.json" --from 2023-01-01
 ```
+
+Note: Always enclose filenames in quotes, especially if they contain spaces or special characters.
 
 You can specify AWS options:
 ```
