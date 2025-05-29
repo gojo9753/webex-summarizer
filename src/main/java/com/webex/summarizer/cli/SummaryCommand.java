@@ -58,10 +58,10 @@ public class SummaryCommand implements Callable<Integer> {
     @Option(names = {"--list-summaries"}, description = "List all conversations with summaries")
     private boolean listSummaries = false;
     
-    @Option(names = {"--start-date"}, description = "Start date for filtering messages (format: yyyy-MM-dd)")
+    @Option(names = {"--start-date", "--from"}, description = "Start date for filtering messages (format: yyyy-MM-dd), e.g., 2025-05-25. If only this is specified, messages from this date to current date will be included.")
     private String startDateStr;
     
-    @Option(names = {"--end-date"}, description = "End date for filtering messages (format: yyyy-MM-dd)")
+    @Option(names = {"--end-date", "--to"}, description = "End date for filtering messages (format: yyyy-MM-dd). Optional if start-date is specified.")
     private String endDateStr;
     
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -185,7 +185,12 @@ public class SummaryCommand implements Callable<Integer> {
             System.out.println("Date from: " + conversation.getDateFrom().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
         }
         if (conversation.getDateTo() != null) {
-            System.out.println("Date to: " + conversation.getDateTo().minusDays(1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+            // Only display "to date" if it's not today (when user only specified start date)
+            LocalDate today = LocalDate.now();
+            LocalDate dateTo = conversation.getDateTo().minusDays(1).toLocalDate();
+            if (!dateTo.equals(today)) {
+                System.out.println("Date to: " + dateTo.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+            }
         }
         
         // Set up progress reporting
@@ -289,6 +294,8 @@ public class SummaryCommand implements Callable<Integer> {
     
     /**
      * Filter messages in the conversation based on start and end dates
+     * Note: WebEx API returns timestamps as epoch seconds which are converted to
+     * ZonedDateTime objects by the Jackson JavaTimeModule during deserialization.
      * 
      * @param conversation The conversation to filter
      */
@@ -299,23 +306,55 @@ public class SummaryCommand implements Callable<Integer> {
         // Parse start date
         if (startDateStr != null && !startDateStr.isEmpty()) {
             try {
-                startDate = LocalDate.parse(startDateStr, DATE_FORMATTER);
+                // Check if date is in correct format
+                if (startDateStr.matches("\\d{4}-\\d{2}-\\d{2}")) {
+                    startDate = LocalDate.parse(startDateStr, DATE_FORMATTER);
+                } else if (startDateStr.matches("\\d{4}-\\d{1,2}-\\d{1,2}")) {
+                    // Try to parse dates like 2025-5-28 or 2025-05-5 by reformatting
+                    String[] parts = startDateStr.split("-");
+                    String year = parts[0];
+                    String month = parts[1].length() == 1 ? "0" + parts[1] : parts[1];
+                    String day = parts[2].length() == 1 ? "0" + parts[2] : parts[2];
+                    startDate = LocalDate.parse(year + "-" + month + "-" + day, DATE_FORMATTER);
+                } else {
+                    throw new DateTimeParseException("Format error", startDateStr, 0);
+                }
+                
                 conversation.setDateFrom(startDate.atStartOfDay(ZonedDateTime.now().getZone()));
-                System.out.println("Filtering messages from " + startDateStr);
+                System.out.println("Filtering messages from " + startDate.format(DATE_FORMATTER));
             } catch (DateTimeParseException e) {
-                System.err.println("Invalid start date format. Please use yyyy-MM-dd. Using no start date filter.");
+                System.err.println("Invalid start date format. Please use yyyy-MM-dd (example: 2025-05-28). Using no start date filter.");
             }
         }
         
         // Parse end date
+        // If end date is provided, parse it. Otherwise, use current date if start date is specified
         if (endDateStr != null && !endDateStr.isEmpty()) {
             try {
-                endDate = LocalDate.parse(endDateStr, DATE_FORMATTER);
+                // Check if date is in correct format
+                if (endDateStr.matches("\\d{4}-\\d{2}-\\d{2}")) {
+                    endDate = LocalDate.parse(endDateStr, DATE_FORMATTER);
+                } else if (endDateStr.matches("\\d{4}-\\d{1,2}-\\d{1,2}")) {
+                    // Try to parse dates like 2025-5-28 or 2025-05-5 by reformatting
+                    String[] parts = endDateStr.split("-");
+                    String year = parts[0];
+                    String month = parts[1].length() == 1 ? "0" + parts[1] : parts[1];
+                    String day = parts[2].length() == 1 ? "0" + parts[2] : parts[2];
+                    endDate = LocalDate.parse(year + "-" + month + "-" + day, DATE_FORMATTER);
+                } else {
+                    throw new DateTimeParseException("Format error", endDateStr, 0);
+                }
+                
                 conversation.setDateTo(endDate.plusDays(1).atStartOfDay(ZonedDateTime.now().getZone()));
-                System.out.println("Filtering messages until " + endDateStr);
+                System.out.println("Filtering messages until " + endDate.format(DATE_FORMATTER));
             } catch (DateTimeParseException e) {
-                System.err.println("Invalid end date format. Please use yyyy-MM-dd. Using no end date filter.");
+                System.err.println("Invalid end date format. Please use yyyy-MM-dd (example: 2025-05-28). Using no end date filter.");
             }
+        } else if (startDate != null) {
+            // If only start date is specified, use current date as end date
+            endDate = LocalDate.now();
+            conversation.setDateTo(endDate.plusDays(1).atStartOfDay(ZonedDateTime.now().getZone()));
+            System.out.println("Filtering messages until current date");
         }
         
         // If no valid dates, return without filtering
