@@ -121,7 +121,7 @@ public class MessageListCommand implements Callable<Integer> {
         
         // Determine pagination parameters
         int pageSize = (messagesPerPage != null && messagesPerPage > 0) ? messagesPerPage : 1000;
-        int totalPages = (int) Math.ceil((double) totalMessages / pageSize);
+        int totalPages = totalMessages > 0 ? (int) Math.ceil((double) totalMessages / pageSize) : 1;
         
         // Validate page number
         if (page < 1) page = 1;
@@ -129,10 +129,15 @@ public class MessageListCommand implements Callable<Integer> {
         
         // Calculate start and end indices for the current page
         int startIndex = (page - 1) * pageSize;
+        
+        // Validate indices to prevent IndexOutOfBoundsException
+        if (startIndex < 0) startIndex = 0;
+        if (startIndex >= totalMessages) startIndex = Math.max(0, totalMessages - pageSize);
+        
         int endIndex = Math.min(startIndex + pageSize, totalMessages);
         
         // Get messages for the current page
-        List<Message> pageMessages = allMessages.subList(startIndex, endIndex);
+        List<Message> pageMessages = totalMessages > 0 ? allMessages.subList(startIndex, endIndex) : List.of();
         
         // Print conversation header with styling
         System.out.println("\n╔══════════════════════════════════════════════════════════════════════════════╗");
@@ -158,6 +163,12 @@ public class MessageListCommand implements Callable<Integer> {
         System.out.println("");
         
         String currentDate = null;
+        
+        // If no messages to display, show a message
+        if (pageMessages.isEmpty()) {
+            System.out.println("\nNo messages found in this conversation.");
+            return;
+        }
         
         // Group messages by date for better readability
         for (int i = 0; i < pageMessages.size(); i++) {
