@@ -111,6 +111,12 @@ Filter messages by date range (from specific date to today):
 java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -r ROOM_ID -s --start-date 2023-01-01
 ```
 
+You can use the shorter alias `--from`:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -r ROOM_ID -s --from 2023-01-01
+```
+
 Or specify both start and end dates:
 
 ```
@@ -127,6 +133,12 @@ You can use alternative shorter parameter names:
 
 ```
 java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --file path/to/conversation/file.json --from 2023-01-01 --to 2023-01-31
+```
+
+Filter only messages from a specific date to current date:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --file path/to/conversation/file.json --from 2023-01-01
 ```
 
 You can specify AWS options:
