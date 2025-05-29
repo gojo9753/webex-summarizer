@@ -102,25 +102,25 @@ java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -r ROOM
 Download a conversation and generate a summary in one command:
 
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -r ROOM_ID -s
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --room ROOM_ID
 ```
 
 Filter messages by date range (from specific date to today):
 
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -r ROOM_ID -s --start-date 2023-01-01
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --room ROOM_ID --start-date 2023-01-01
 ```
 
 You can use the shorter alias `--from`:
 
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -r ROOM_ID -s --from 2023-01-01
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --room ROOM_ID --from 2023-01-01
 ```
 
 Or specify both start and end dates:
 
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -r ROOM_ID -s --start-date 2023-01-01 --end-date 2023-01-31
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --room ROOM_ID --start-date 2023-01-01 --end-date 2023-01-31
 ```
 
 You can also summarize a downloaded conversation file with date filtering:
@@ -145,7 +145,7 @@ Note: Always enclose filenames in quotes, especially if they contain spaces or s
 
 You can specify AWS options:
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -r ROOM_ID -s -p custom-profile --region us-west-2 -m anthropic.claude-3-sonnet-20240229-v1:0
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --room ROOM_ID --aws-profile custom-profile --region us-west-2 --model anthropic.claude-3-sonnet-20240229-v1:0
 ```
 
 ### List Downloaded Files
