@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.awssdk.core.SdkBytes;
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeClient;
 import software.amazon.awssdk.services.bedrockruntime.model.InvokeModelRequest;
@@ -49,12 +50,17 @@ public class BedrockClient {
         this.runtimeClient = BedrockRuntimeClient.builder()
                 .region(awsRegion)
                 .credentialsProvider(credentialsProvider)
+                .httpClient(ApacheHttpClient.builder()
+                    .socketTimeout(java.time.Duration.ofMinutes(10))
+                    .connectionTimeout(java.time.Duration.ofMinutes(5))
+                    .connectionAcquisitionTimeout(java.time.Duration.ofMinutes(5))
+                    .build())
                 .overrideConfiguration(config -> 
-                    config.apiCallTimeout(java.time.Duration.ofMinutes(5))
-                         .apiCallAttemptTimeout(java.time.Duration.ofMinutes(5)))
+                    config.apiCallTimeout(java.time.Duration.ofMinutes(15))
+                         .apiCallAttemptTimeout(java.time.Duration.ofMinutes(10)))
                 .build();
                 
-        logger.info("AWS Bedrock runtime client initialized with profile: {} and region: {} (timeout: 5 minutes)",
+        logger.info("AWS Bedrock runtime client initialized with profile: {} and region: {} (socket timeout: 10 minutes, API timeout: 15 minutes)",
                    awsProfile, awsRegion);
     }
     
