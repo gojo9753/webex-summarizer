@@ -21,7 +21,7 @@ public class LlmSummarizer {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     
     // Constants for chunking and summarization
-    private static final int MAX_TOKENS_PER_CHUNK = 150000; // Maximum tokens in each chunk (to stay within context limits for most models)
+    private static final int MAX_TOKENS_PER_CHUNK = 50000; // Maximum tokens in each chunk (to stay within context limits for most models)
     private static final int TOKENS_PER_CHARACTER = 4; // Approximate ratio of characters to tokens (1 token ~= 4 chars in English)
     private static final int CHUNK_BUFFER_TOKENS = 1000; // Buffer tokens for formatting, system messages, etc.
     
