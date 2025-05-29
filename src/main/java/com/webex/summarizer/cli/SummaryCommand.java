@@ -117,6 +117,8 @@ public class SummaryCommand implements Callable<Integer> {
                 return 1; // Error occurred in loading or downloading
             }
             
+            // We'll check for empty conversations after date filtering in the generateSummary method
+            
             // Generate and save summary
             return generateSummary(conversation, summarizer, storage);
             
@@ -191,6 +193,30 @@ public class SummaryCommand implements Callable<Integer> {
             if (!dateTo.equals(today)) {
                 System.out.println("Date to: " + dateTo.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
             }
+        }
+        
+        // Check if there are any messages to summarize after potential date filtering
+        if (conversation.getMessages() == null || conversation.getMessages().isEmpty()) {
+            System.out.println("\nWarning: No messages found to summarize.");
+            
+            // Construct appropriate message based on whether date filtering was applied
+            String noMessagesMessage;
+            if (conversation.getDateFrom() != null || conversation.getDateTo() != null) {
+                noMessagesMessage = "No messages were found in the date range specified. " +
+                    "This could be because no messages exist within the date range you selected, " +
+                    "or because the room \"" + conversation.getRoom().getTitle() + "\" is empty.";
+            } else {
+                noMessagesMessage = "This appears to be an empty chat or group. " +
+                    "The room \"" + conversation.getRoom().getTitle() + "\" exists but contains no messages.";
+            }
+            
+            // Save the empty summary
+            storage.saveSummary(conversation, noMessagesMessage);
+            
+            // Display a simple formatted summary
+            SummaryFormatter.printFormattedSummary(noMessagesMessage);
+            
+            return 0;
         }
         
         // Set up progress reporting
@@ -387,5 +413,11 @@ public class SummaryCommand implements Callable<Integer> {
         // Report filtering results
         System.out.println("Filtered messages by date: " + filteredMessages.size() + 
                 " (out of " + originalCount + " messages)");
+                
+        // Check if we filtered out all messages
+        if (filteredMessages.isEmpty() && originalCount > 0) {
+            System.out.println("\nWarning: All messages were filtered out based on your date criteria.");
+            System.out.println("No messages exist in this conversation within the date range you specified.");
+        }
     }
 }
