@@ -4,6 +4,7 @@ import com.webex.summarizer.api.WebExMessageService;
 import com.webex.summarizer.api.WebExRoomService;
 import com.webex.summarizer.auth.WebExAuthenticator;
 import com.webex.summarizer.model.Conversation;
+import com.webex.summarizer.model.Message;
 import com.webex.summarizer.storage.ConversationStorage;
 import com.webex.summarizer.summarizer.LlmSummarizer;
 import com.webex.summarizer.util.ConfigLoader;
@@ -17,8 +18,13 @@ import picocli.CommandLine.Option;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
 
 @Command(name = "summarize", description = "Generate summaries for WebEx conversations", mixinStandardHelpOptions = true)
 public class SummaryCommand implements Callable<Integer> {
@@ -51,6 +57,14 @@ public class SummaryCommand implements Callable<Integer> {
     
     @Option(names = {"--list-summaries"}, description = "List all conversations with summaries")
     private boolean listSummaries = false;
+    
+    @Option(names = {"--start-date"}, description = "Start date for filtering messages (format: yyyy-MM-dd)")
+    private String startDateStr;
+    
+    @Option(names = {"--end-date"}, description = "End date for filtering messages (format: yyyy-MM-dd)")
+    private String endDateStr;
+    
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     @Override
     public Integer call() throws Exception {
@@ -157,9 +171,22 @@ public class SummaryCommand implements Callable<Integer> {
     }
     
     private int generateSummary(Conversation conversation, LlmSummarizer summarizer, ConversationStorage storage) throws IOException {
+        // Filter messages by date if date parameters are provided
+        if (startDateStr != null || endDateStr != null) {
+            filterMessagesByDate(conversation);
+        }
+        
         // Display basic conversation info
         System.out.println("\nRoom: " + conversation.getRoom().getTitle());
         System.out.println("Messages: " + conversation.getMessages().size());
+        
+        // Display date range if filtered
+        if (conversation.getDateFrom() != null) {
+            System.out.println("Date from: " + conversation.getDateFrom().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+        }
+        if (conversation.getDateTo() != null) {
+            System.out.println("Date to: " + conversation.getDateTo().minusDays(1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+        }
         
         // Set up progress reporting
         summarizer.setProgressListener(new LlmSummarizer.SummarizationProgressListener() {
@@ -258,5 +285,68 @@ public class SummaryCommand implements Callable<Integer> {
             return str;
         }
         return str.substring(0, maxLength - 3) + "...";
+    }
+    
+    /**
+     * Filter messages in the conversation based on start and end dates
+     * 
+     * @param conversation The conversation to filter
+     */
+    private void filterMessagesByDate(Conversation conversation) {
+        LocalDate startDate = null;
+        LocalDate endDate = null;
+        
+        // Parse start date
+        if (startDateStr != null && !startDateStr.isEmpty()) {
+            try {
+                startDate = LocalDate.parse(startDateStr, DATE_FORMATTER);
+                conversation.setDateFrom(startDate.atStartOfDay(ZonedDateTime.now().getZone()));
+                System.out.println("Filtering messages from " + startDateStr);
+            } catch (DateTimeParseException e) {
+                System.err.println("Invalid start date format. Please use yyyy-MM-dd. Using no start date filter.");
+            }
+        }
+        
+        // Parse end date
+        if (endDateStr != null && !endDateStr.isEmpty()) {
+            try {
+                endDate = LocalDate.parse(endDateStr, DATE_FORMATTER);
+                conversation.setDateTo(endDate.plusDays(1).atStartOfDay(ZonedDateTime.now().getZone()));
+                System.out.println("Filtering messages until " + endDateStr);
+            } catch (DateTimeParseException e) {
+                System.err.println("Invalid end date format. Please use yyyy-MM-dd. Using no end date filter.");
+            }
+        }
+        
+        // If no valid dates, return without filtering
+        if (startDate == null && endDate == null) {
+            return;
+        }
+        
+        final LocalDate finalStartDate = startDate;
+        final LocalDate finalEndDate = endDate;
+        
+        // Save original message count for reporting
+        int originalCount = conversation.getMessages().size();
+        
+        // Filter messages by date
+        List<Message> filteredMessages = conversation.getMessages().stream()
+            .filter(message -> {
+                ZonedDateTime created = message.getCreated();
+                LocalDate messageDate = created.toLocalDate();
+                
+                boolean afterStartDate = finalStartDate == null || !messageDate.isBefore(finalStartDate);
+                boolean beforeEndDate = finalEndDate == null || !messageDate.isAfter(finalEndDate);
+                
+                return afterStartDate && beforeEndDate;
+            })
+            .collect(Collectors.toList());
+        
+        // Update the conversation with filtered messages
+        conversation.setMessages(filteredMessages);
+        
+        // Report filtering results
+        System.out.println("Filtered messages by date: " + filteredMessages.size() + 
+                " (out of " + originalCount + " messages)");
     }
 }

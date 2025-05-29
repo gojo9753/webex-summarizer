@@ -94,14 +94,15 @@ public class LlmSummarizerTest {
         
         List<Message> messages = new ArrayList<>();
         
-        // Create a small number of very large messages to force token-based chunking
-        // Each message will be roughly 15,000 tokens (60,000 characters)
+        // Create messages large enough to exceed the MAX_TOKENS_PER_CHUNK limit (currently 150,000)
+        // Each message will be roughly 60,000 tokens (240,000 characters)
         StringBuilder largeText = new StringBuilder();
-        for (int i = 0; i < 60000; i++) {
+        for (int i = 0; i < 240000; i++) {
             largeText.append("x");
         }
         
-        // Create 5 large messages (each ~15,000 tokens, so total ~75,000 tokens)
+        // Create 5 large messages (each ~60,000 tokens, so total ~300,000 tokens)
+        // This ensures we'll need multiple chunks regardless of the MAX_TOKENS_PER_CHUNK value
         for (int i = 0; i < 5; i++) {
             Message message = new Message();
             message.setId("msg-" + i);
@@ -147,11 +148,8 @@ public class LlmSummarizerTest {
                 super("default", "us-east-1", "anthropic.claude-v2");
             }
             
-            // Override calculateChunkCount to always return at least 2 chunks
-            @Override
-            protected int calculateChunkCount(List<Message> messages) {
-                return Math.max(2, super.calculateChunkCount(messages));
-            }
+            // No need to override calculateChunkCount anymore as our messages are large enough
+            // to naturally force chunking with the current MAX_TOKENS_PER_CHUNK value
         }
         
         TestSummarizer summarizer = new TestSummarizer();

@@ -105,6 +105,12 @@ Download a conversation and generate a summary in one command:
 java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -r ROOM_ID -s
 ```
 
+Filter messages by date range:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -r ROOM_ID -s --start-date 2023-01-01 --end-date 2023-01-31
+```
+
 You can specify AWS options:
 ```
 java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -r ROOM_ID -s -p custom-profile --region us-west-2 -m anthropic.claude-3-sonnet-20240229-v1:0
@@ -208,6 +214,12 @@ Generate a summary from a WebEx room:
 
 ```
 java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --room ROOM_ID
+```
+
+Filter messages by date range:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar summarize --room ROOM_ID --start-date 2023-01-01 --end-date 2023-01-31
 ```
 
 Summarize a previously downloaded conversation:
