@@ -83,7 +83,9 @@ There are two ways to set your WebEx token:
 
 ### Search Conversations and Get Answers
 
-The application allows you to search through conversations and get AI-generated answers to questions based on your message history:
+The application allows you to search through conversations and get AI-generated answers to questions based on your message history. You can search either an existing conversation file or download directly from a WebEx room:
+
+#### Search from a saved conversation file
 
 Search for specific keywords in a conversation:
 ```
@@ -94,6 +96,25 @@ Ask questions about a conversation and get AI-generated answers:
 ```
 java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --question "When is the project deadline?"
 ```
+
+#### Download and search directly from WebEx
+
+Search keywords in a WebEx room without downloading first:
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --query "project deadline"
+```
+
+Ask questions about a WebEx room conversation:
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --question "When is the project deadline?"
+```
+
+Provide a WebEx token directly:
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --token YOUR_WEBEX_TOKEN --question "What did we discuss yesterday?"
+```
+
+#### Additional search options
 
 Ask about discussions from specific dates:
 ```
@@ -230,13 +251,16 @@ Search messages and get AI-powered answers to questions about your conversations
 java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --query "project status"
 ```
 
-Ask questions about your conversation content:
+Ask questions about a WebEx room directly:
 
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --question "When is the meeting scheduled?"
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --question "When is the meeting scheduled?"
 ```
 
 Advanced options:
+- `--file <path>`: Path to a saved conversation file to search
+- `--room <id>`: WebEx room ID to download and search
+- `--token <token>`: WebEx API token to use (if not in config)
 - `--query <text>`: Search term to find in messages
 - `--question <text>`: Question to answer based on the conversation
 - `--context <number>`: Number of messages to include before and after each match (default: 2)

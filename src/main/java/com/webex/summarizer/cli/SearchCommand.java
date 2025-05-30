@@ -1,5 +1,8 @@
 package com.webex.summarizer.cli;
 
+import com.webex.summarizer.api.WebExMessageService;
+import com.webex.summarizer.api.WebExRoomService;
+import com.webex.summarizer.auth.WebExAuthenticator;
 import com.webex.summarizer.model.Conversation;
 import com.webex.summarizer.model.Message;
 import com.webex.summarizer.search.ConversationSearch;
@@ -37,8 +40,14 @@ public class SearchCommand implements Callable<Integer> {
     @Option(names = {"-o", "--output-dir"}, description = "Output directory for downloaded conversations")
     private String outputDir;
     
-    @Option(names = {"--file"}, description = "Path to a saved conversation file to search", required = true)
+    @Option(names = {"--token"}, description = "WebEx API token to use")
+    private String token;
+    
+    @Option(names = {"--file"}, description = "Path to a saved conversation file to search")
     private String filePath;
+    
+    @Option(names = {"--room"}, description = "WebEx room ID to download and search")
+    private String roomId;
     
     @Option(names = {"--query", "-q"}, description = "Search query to find matching messages")
     private String searchQuery;
@@ -76,9 +85,27 @@ public class SearchCommand implements Callable<Integer> {
             
             ConversationStorage storage = new ConversationStorage(outputDir);
             ConversationSearch searcher = new ConversationSearch();
-
-            // Load conversation
-            Conversation conversation = loadConversation(filePath, storage);
+            
+            // Either load from file or download from room ID
+            Conversation conversation = null;
+            
+            if (filePath != null) {
+                // Load from file
+                conversation = loadConversation(filePath, storage);
+            } else if (roomId != null) {
+                // Download from WebEx
+                WebExAuthenticator authenticator = initializeAuthenticator(configLoader);
+                if (authenticator == null) {
+                    System.err.println("Authentication failed. Please provide a valid WebEx token.");
+                    return 1;
+                }
+                
+                conversation = downloadConversation(roomId, authenticator, storage);
+            } else {
+                System.err.println("Please specify either a room ID (--room) or a file path (--file).");
+                return 1;
+            }
+            
             if (conversation == null) {
                 return 1;
             }
@@ -120,6 +147,22 @@ public class SearchCommand implements Callable<Integer> {
         
         System.out.println("Loading conversation from " + filePath);
         return storage.loadConversation(filePath);
+    }
+    
+    private Conversation downloadConversation(String roomId, WebExAuthenticator authenticator, ConversationStorage storage) throws IOException {
+        // Initialize API services
+        WebExRoomService roomService = new WebExRoomService(authenticator);
+        WebExMessageService messageService = new WebExMessageService(authenticator, roomService);
+        
+        System.out.println("Downloading conversation from room " + roomId + "...");
+        Conversation conversation = messageService.downloadConversation(roomId);
+        
+        // Save the conversation to file
+        storage.saveConversation(conversation);
+        System.out.println("Conversation downloaded successfully with " + 
+                conversation.getMessages().size() + " messages and saved to file.");
+        
+        return conversation;
     }
     
     private void performSearch(
@@ -509,6 +552,22 @@ public class SearchCommand implements Callable<Integer> {
         }
         
         return null;
+    }
+    
+    private WebExAuthenticator initializeAuthenticator(ConfigLoader configLoader) throws IOException {
+        // First try to use token from command line
+        String webexToken = token;
+        
+        // If not provided, try to get it from config
+        if (webexToken == null || webexToken.isEmpty()) {
+            webexToken = configLoader.getProperty("webex.token");
+            if (webexToken == null || webexToken.isEmpty()) {
+                System.err.println("No WebEx token found. Please provide a token with --token or set webex.token in config.properties.");
+                return null;
+            }
+        }
+        
+        return new WebExAuthenticator(webexToken);
     }
     
     private String formatSender(String email) {
