@@ -28,6 +28,12 @@ public class LlmSummarizer {
     private final BedrockClient bedrockClient;
     private SummarizationProgressListener progressListener;
     
+    // Modes for the summarizer
+    public enum Mode {
+        SUMMARIZE,    // Generate summary
+        ANSWER        // Answer questions
+    }
+    
     /**
      * Interface for reporting summarization progress
      */
@@ -52,11 +58,37 @@ public class LlmSummarizer {
      * Generate a summary for a conversation, splitting into chunks if necessary
      */
     public String generateSummary(Conversation conversation) throws IOException {
+        return processConversation(conversation, Mode.SUMMARIZE, null);
+    }
+    
+    /**
+     * Generate an answer to a question based on a conversation
+     * 
+     * @param conversation The conversation to analyze
+     * @param question The question to answer
+     * @return The answer to the question
+     * @throws IOException If an error occurs with the Bedrock API
+     */
+    public String answerQuestion(Conversation conversation, String question) throws IOException {
+        return processConversation(conversation, Mode.ANSWER, question);
+    }
+    
+    /**
+     * Process a conversation in either summary or question-answering mode
+     * 
+     * @param conversation The conversation to process
+     * @param mode The mode to use (summarize or answer)
+     * @param question The question to answer (if mode is ANSWER)
+     * @return The summary or answer
+     * @throws IOException If an error occurs with the Bedrock API
+     */
+    private String processConversation(Conversation conversation, Mode mode, String question) throws IOException {
         List<Message> messages = conversation.getMessages();
         String roomTitle = conversation.getRoom().getTitle();
         int messageCount = messages.size();
         
-        logger.info("Starting summarization for conversation with {} messages", messageCount);
+        String operationName = (mode == Mode.SUMMARIZE) ? "summarization" : "question answering";
+        logger.info("Starting {} for conversation with {} messages", operationName, messageCount);
         
         // Calculate total token count for the conversation
         int estimatedTokens = calculateTotalTokens(messages);
@@ -64,17 +96,26 @@ public class LlmSummarizer {
         
         logger.info("Estimated token count for conversation: {}", estimatedTokens);
         
-        // For small conversations (token-wise), use single summarization
+        // For small conversations (token-wise), use single processing
         if (estimatedTokens <= maxTokensPerChunkWithBuffer) {
-            logger.info("Conversation is small enough for direct summarization ({} tokens)", estimatedTokens);
+            logger.info("Conversation is small enough for direct processing ({} tokens)", estimatedTokens);
             reportProgress(1, 1, "Processing full conversation");
             String conversationText = formatConversation(conversation);
-            return generateSingleSummary(conversationText, roomTitle);
+            
+            if (mode == Mode.SUMMARIZE) {
+                return generateSingleSummary(conversationText, roomTitle);
+            } else {
+                return answerQuestionDirectly(conversationText, roomTitle, question);
+            }
         }
         
-        // For large conversations, use chunked summarization
-        logger.info("Large conversation detected ({} tokens), using chunked summarization approach", estimatedTokens);
-        return generateChunkedSummary(messages, roomTitle);
+        // For large conversations, use chunked processing
+        logger.info("Large conversation detected ({} tokens), using chunked approach", estimatedTokens);
+        if (mode == Mode.SUMMARIZE) {
+            return generateChunkedSummary(messages, roomTitle);
+        } else {
+            return answerQuestionChunked(messages, roomTitle, question);
+        }
     }
     
     /**
@@ -323,6 +364,145 @@ public class LlmSummarizer {
         }
         
         return sb.toString();
+    }
+    
+    /**
+     * Generate an answer to a question from a single conversation chunk
+     * 
+     * @param conversationText The formatted conversation text
+     * @param roomTitle The title of the room
+     * @param question The question to answer
+     * @return The answer to the question
+     * @throws IOException If an error occurs with the Bedrock API
+     */
+    private String answerQuestionDirectly(String conversationText, String roomTitle, String question) throws IOException {
+        String prompt = "You are an AI assistant that answers questions about Cisco WebEx conversations. " +
+                "I will provide you with a conversation from a WebEx room titled '" + roomTitle + "' and a question. " +
+                "Please answer the question based ONLY on the information in the conversation. " +
+                "If the answer is not in the provided conversation, say 'I don't see this information " +
+                "in the provided conversation.' Don't make up information that isn't present.\n\n" +
+                "Format your answer clearly and directly with these guidelines:\n" +
+                "- Start with '**Answer**:' in bold followed by your brief, direct answer\n" +
+                "- If relevant, add a '**Context**:' section with supporting details from the conversation\n" +
+                "- If you reference specific messages, include the date/time and person who sent them\n" +
+                "- Use bullet points for clarity when listing multiple pieces of information\n\n" +
+                "Conversation from room '" + roomTitle + "':\n\n" + 
+                conversationText + "\n\n" +
+                "Question: " + question + "\n\n" +
+                "Answer:";
+        
+        try {
+            logger.info("Generating answer to question using AWS Bedrock...");
+            String answer = bedrockClient.generateText(prompt);
+            logger.info("Answer generated successfully");
+            return answer;
+        } catch (IOException e) {
+            logger.error("Failed to generate answer: {}", e.getMessage());
+            throw e;
+        }
+    }
+    
+    /**
+     * Generate an answer to a question from multiple conversation chunks
+     * 
+     * @param messages The list of messages
+     * @param roomTitle The title of the room
+     * @param question The question to answer
+     * @return The answer to the question
+     * @throws IOException If an error occurs with the Bedrock API
+     */
+    private String answerQuestionChunked(List<Message> messages, String roomTitle, String question) throws IOException {
+        int messageCount = messages.size();
+        
+        // Calculate number of chunks needed
+        int chunkCount = calculateChunkCount(messages);
+        logger.info("Splitting conversation into {} chunks for question answering", chunkCount);
+        
+        List<String> chunkAnswers = new ArrayList<>();
+        List<List<Message>> messageChunks = splitMessagesIntoChunks(messages, chunkCount);
+        
+        // Process each chunk
+        for (int i = 0; i < messageChunks.size(); i++) {
+            List<Message> chunk = messageChunks.get(i);
+            reportProgress(i + 1, messageChunks.size(), "Processing chunk " + (i + 1) + "/" + messageChunks.size());
+            
+            String chunkText = formatMessageChunk(chunk, roomTitle, i + 1, messageChunks.size());
+            String chunkPrompt = "You are an AI assistant that answers questions about Cisco WebEx conversations. " +
+                               "I will provide you with part " + (i + 1) + " of " + messageChunks.size() + 
+                               " from a WebEx conversation and a question. " +
+                               "Your task is to extract ANY information from this conversation part that might help answer the question. " +
+                               "If this part contains information relevant to the question, provide that information in a clear, concise format. " +
+                               "If this part does not contain information relevant to the question, simply say " +
+                               "'No relevant information about this question in this conversation part.'\n\n" +
+                               "Focus on finding facts, dates, decisions, or statements that relate directly to the question.\n\n" +
+                               "Conversation part " + (i + 1) + " of " + messageChunks.size() + ":\n\n" + 
+                               chunkText + "\n\n" +
+                               "Question: " + question + "\n\n" +
+                               "Information relevant to this question:";
+            
+            int chunkTokens = calculateTotalTokens(chunk);
+            logger.info("Analyzing chunk {} of {} for question answering ({} messages, ~{} tokens)", 
+                       i + 1, messageChunks.size(), chunk.size(), chunkTokens);
+            String chunkAnswer = bedrockClient.generateText(chunkPrompt);
+            
+            // Only include non-empty answers
+            if (chunkAnswer != null && !chunkAnswer.trim().isEmpty() && 
+                !chunkAnswer.toLowerCase().contains("no relevant information")) {
+                chunkAnswers.add(chunkAnswer);
+                logger.info("Chunk {} contains relevant information for the question", i + 1);
+            } else {
+                logger.info("Chunk {} does not contain relevant information for the question", i + 1);
+            }
+        }
+        
+        // Generate final answer from all chunk answers
+        reportProgress(chunkCount + 1, chunkCount + 1, "Creating final answer");
+        return generateFinalAnswer(chunkAnswers, roomTitle, messageCount, question);
+    }
+    
+    /**
+     * Generate a final answer based on information from multiple chunks
+     * 
+     * @param chunkAnswers Relevant information from each chunk
+     * @param roomTitle The title of the room
+     * @param totalMessageCount Total number of messages analyzed
+     * @param question The original question
+     * @return The final answer
+     * @throws IOException If an error occurs with the Bedrock API
+     */
+    private String generateFinalAnswer(List<String> chunkAnswers, String roomTitle, int totalMessageCount, String question) throws IOException {
+        // If no chunks contained relevant information
+        if (chunkAnswers.isEmpty()) {
+            return "**Answer**: Based on my analysis of the conversation, I don't have enough information to answer your question about \"" + 
+                   question + "\". The conversation in room \"" + roomTitle + "\" does not appear to contain relevant details about this topic.";
+        }
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append("You are an AI assistant tasked with answering a question based on multiple pieces of information " +
+                 "extracted from different parts of a WebEx conversation. Below you will find:\n\n" +
+                 "1. The original question\n" +
+                 "2. Information extracted from different parts of the conversation that may be relevant\n\n" +
+                 "Your task is to synthesize this information into a comprehensive, well-structured answer to the question.\n\n");
+                 
+        sb.append("Format your response with these clearly formatted sections:\n");
+        sb.append("1. Start with '**Answer**:' in bold, giving a direct answer to the question based on the evidence\n");
+        sb.append("2. Include a '**Supporting Information**:' section with key details from the conversation\n");
+        sb.append("3. If appropriate, include any relevant dates, names, or specific facts mentioned\n\n");
+        
+        sb.append("Original Question: ").append(question).append("\n\n");
+        sb.append("Information extracted from conversation in room '").append(roomTitle).append("':\n\n");
+        
+        for (int i = 0; i < chunkAnswers.size(); i++) {
+            sb.append("--- Information Block ").append(i + 1).append(" ---\n");
+            sb.append(chunkAnswers.get(i)).append("\n\n");
+        }
+        
+        sb.append("Please provide a complete answer to the question based ONLY on the information above. " +
+                 "If the information is insufficient to fully answer the question, clearly state what is known " +
+                 "and what is not known based on the available information.");
+        
+        logger.info("Generating final answer from {} information blocks", chunkAnswers.size());
+        return bedrockClient.generateText(sb.toString());
     }
     
     public List<Map<String, String>> listAvailableModels() {

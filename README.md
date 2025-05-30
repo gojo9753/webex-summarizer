@@ -83,57 +83,52 @@ There are two ways to set your WebEx token:
 
 ### Search Conversations and Get Answers
 
-The application allows you to search through conversations and get AI-generated answers to questions based on your message history. You can search either an existing conversation file or download directly from a WebEx room:
+The application provides an advanced Q&A system that uses the same powerful LLM chunking technology as the summarization feature. You can search through conversations and get AI-generated answers to questions about your message history.
 
-#### Search from a saved conversation file
+#### Ask Questions About Your Conversations
 
-Search for specific keywords in a conversation:
+Ask questions about a saved conversation file:
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --query "project deadline"
-```
-
-Ask questions about a conversation and get AI-generated answers:
-```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --question "When is the project deadline?"
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "conversations/Meeting_Y2lzY29.json" --question "What decisions were made about the launch date?"
 ```
 
-#### Download and search directly from WebEx
-
-Search keywords in a WebEx room without downloading first:
+Ask about specific dates in your conversation history:
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --query "project deadline"
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "conversations/Team_Y2lzY29.json" --question "What did we discuss on May 26th?"
 ```
 
-Ask questions about a WebEx room conversation:
+#### Download and Query Directly From WebEx
+
+Ask questions about a WebEx room without downloading first:
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --question "When is the project deadline?"
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --question "What were the action items from our last meeting?"
 ```
 
-Provide a WebEx token directly:
+Provide a WebEx token directly when asking questions:
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --token YOUR_WEBEX_TOKEN --question "What did we discuss yesterday?"
-```
-
-#### Additional search options
-
-Ask about discussions from specific dates:
-```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --question "What did we discuss on May 26th?"
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --token YOUR_WEBEX_TOKEN --question "What did we decide about the budget?"
 ```
 
-Filter search results by date range:
+#### Advanced Search Options
+
+Search for specific keywords and see matching messages:
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --query "budget" --from 2023-01-01 --to 2023-01-31
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "conversations/Project_Y2lzY29.json" --query "deadline"
 ```
 
-Configure the amount of context shown around search results:
+Filter by date range:
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --query "project" --context 5
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "conversations/Quarter_Y2lzY29.json" --question "What were our key achievements?" --from 2023-01-01 --to 2023-03-31
 ```
 
-Use a specific AWS model for answer generation:
+Set context size for search results:
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --question "What are our next steps?" --model anthropic.claude-3-sonnet-20240229-v1:0
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "conversations/Design_Y2lzY29.json" --query "prototype" --context 5
+```
+
+Use a specific AWS model:
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "conversations/Technical_Y2lzY29.json" --question "Explain the architecture decisions" --model anthropic.claude-3-sonnet-20240229-v1:0
 ```
 
 ### List Available Rooms
@@ -245,16 +240,16 @@ For large conversations, the app will automatically split the conversation into 
 
 #### Search and Answer from Conversations
 
-Search messages and get AI-powered answers to questions about your conversations:
+Ask questions about your conversation history and get AI-powered answers:
 
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --query "project status"
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "conversations/Project_Team.json" --question "What decisions were made in the last meeting?"
 ```
 
-Ask questions about a WebEx room directly:
+Search directly from a WebEx room without downloading first:
 
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --question "When is the meeting scheduled?"
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --question "What did we discuss on May 26th?"
 ```
 
 Advanced options:
@@ -429,13 +424,14 @@ To contribute to the project:
 - Dynamically adjusts chunking strategy based on conversation characteristics
 
 ### Search and Question Answering
-- Full-text search across all messages in a conversation
-- Natural language question answering using AWS Bedrock LLMs
+- Powerful LLM-based Q&A system using the same chunking technology as summarization
 - Smart date recognition for questions about specific dates (e.g., "What was discussed on May 26th?")
-- Context retrieval to show messages before and after each match
-- Advanced filtering by date range to narrow search results
-- Configurable context window to include surrounding messages
-- Beautifully formatted output with highlighted search matches
+- Handles large conversations by analyzing chunks of content for relevant information
+- Process both from saved files or directly from WebEx rooms
+- Optimized for providing comprehensive answers on date-specific questions 
+- Full-text search capability to find and highlight message matches
+- Advanced filtering by date range to narrow search context
+- Beautifully formatted output with clear question/answer presentation
 
 ## License
 

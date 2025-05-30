@@ -7,6 +7,7 @@ import com.webex.summarizer.model.Conversation;
 import com.webex.summarizer.model.Message;
 import com.webex.summarizer.search.ConversationSearch;
 import com.webex.summarizer.search.QuestionAnswerer;
+import com.webex.summarizer.summarizer.LlmSummarizer;
 import com.webex.summarizer.storage.ConversationStorage;
 import com.webex.summarizer.util.ConfigLoader;
 import org.slf4j.Logger;
@@ -254,79 +255,113 @@ public class SearchCommand implements Callable<Integer> {
             ZonedDateTime startDate,
             ZonedDateTime endDate) throws IOException {
         
-        // Initialize the question answerer
+        // Initialize the LlmSummarizer for QA
         String profile = awsProfile != null ? awsProfile : configLoader.getProperty("aws.profile", "default");
         String region = awsRegion != null ? awsRegion : configLoader.getProperty("aws.region", "us-east-1");
         String model = modelId != null ? modelId : configLoader.getProperty("aws.bedrock.model", "anthropic.claude-v2");
         
-        QuestionAnswerer answerer = new QuestionAnswerer(profile, region, model);
+        LlmSummarizer summarizer = new LlmSummarizer(profile, region, model);
         
-        // First, we need to search for relevant messages
-        // We use the question itself as the search query for finding relevant content
-        List<Message> relevantMessages;
-        
-        if (searchQuery != null && !searchQuery.isEmpty()) {
-            // If a search query was provided, use those results
-            if (startDate != null || endDate != null) {
-                relevantMessages = searcher.searchMessages(conversation, searchQuery, startDate, endDate);
-            } else {
-                relevantMessages = searcher.searchMessages(conversation, searchQuery);
-            }
-        } else {
-            // Check if the question is asking about a specific date
-            ZonedDateTime specificDate = extractDateFromQuestion(question);
-            
-            if (specificDate != null) {
-                // If a date is found in the question, retrieve messages from that date
-                ZonedDateTime startOfDay = specificDate.toLocalDate().atStartOfDay(ZoneId.systemDefault());
-                ZonedDateTime endOfDay = startOfDay.plusDays(1).minusNanos(1);
+        // Set up progress reporting
+        summarizer.setProgressListener(new LlmSummarizer.SummarizationProgressListener() {
+            @Override
+            public void onSummarizationProgress(int currentChunk, int totalChunks, String status) {
+                // Create a progress bar for visual feedback
+                int progressBarWidth = 30;
+                int progress = (int)((double)currentChunk / totalChunks * progressBarWidth);
                 
-                System.out.println("\nDetected date query for: " + startOfDay.format(DATE_FORMATTER));
-                
-                // Get all messages from that date
-                relevantMessages = conversation.getMessages().stream()
-                    .filter(m -> !m.getCreated().isBefore(startOfDay) && !m.getCreated().isAfter(endOfDay))
-                    .collect(java.util.stream.Collectors.toList());
-                
-                System.out.println("Found " + relevantMessages.size() + " messages from this date");
-            } else if (startDate != null || endDate != null) {
-                relevantMessages = searcher.searchMessages(conversation, question, startDate, endDate);
-            } else {
-                relevantMessages = searcher.searchMessages(conversation, question);
-            }
-        }
-        
-        if (relevantMessages.isEmpty()) {
-            // Even when no messages are found, generate a formatted answer
-            String noMessagesAnswer = answerer.generateAnswer(question, new ArrayList<>());
-            System.out.println(noMessagesAnswer);
-            return;
-        }
-        
-        // Add context to the relevant messages
-        List<Message> messagesWithContext = new ArrayList<>();
-        for (Message message : relevantMessages) {
-            List<Message> contextMessages = searcher.getMessageContext(conversation, message, contextSize);
-            for (Message contextMsg : contextMessages) {
-                // Add message if it's not already in the list
-                if (!containsMessage(messagesWithContext, contextMsg)) {
-                    messagesWithContext.add(contextMsg);
+                StringBuilder progressBar = new StringBuilder("[");
+                for (int i = 0; i < progressBarWidth; i++) {
+                    if (i < progress) {
+                        progressBar.append("=");
+                    } else if (i == progress) {
+                        progressBar.append(">");
+                    } else {
+                        progressBar.append(" ");
+                    }
                 }
+                progressBar.append("] ");
+                progressBar.append(currentChunk).append("/").append(totalChunks);
+                
+                // Clear line and print progress
+                System.out.print("\r" + progressBar + " " + status + "                       ");
+                System.out.flush();
             }
+        });
+        
+        // Apply date filtering if specified
+        if (startDate != null || endDate != null) {
+            // Filter messages by date
+            final ZonedDateTime finalStartDate = startDate;
+            final ZonedDateTime finalEndDate = endDate;
+            
+            List<Message> filteredMessages = conversation.getMessages().stream()
+                .filter(message -> {
+                    ZonedDateTime created = message.getCreated();
+                    boolean afterStartDate = finalStartDate == null || !created.isBefore(finalStartDate);
+                    boolean beforeEndDate = finalEndDate == null || !created.isAfter(finalEndDate);
+                    return afterStartDate && beforeEndDate;
+                })
+                .collect(java.util.stream.Collectors.toList());
+            
+            // Create a new conversation with filtered messages
+            Conversation filteredConversation = new Conversation();
+            filteredConversation.setRoom(conversation.getRoom());
+            filteredConversation.setMessages(filteredMessages);
+            conversation = filteredConversation;
+            
+            System.out.println("Filtered conversation to " + filteredMessages.size() + 
+                             " messages between " + 
+                             (startDate != null ? startDate.format(DATE_FORMATTER) : "beginning") + " and " +
+                             (endDate != null ? endDate.format(DATE_FORMATTER) : "end"));
+        }
+        
+        // Check if the question is asking about a specific date
+        ZonedDateTime specificDate = extractDateFromQuestion(question);
+        if (specificDate != null) {
+            // If a date is found in the question, filter messages from that date
+            ZonedDateTime startOfDay = specificDate.toLocalDate().atStartOfDay(ZoneId.systemDefault());
+            ZonedDateTime endOfDay = startOfDay.plusDays(1).minusNanos(1);
+            
+            System.out.println("\nDetected date query for: " + startOfDay.format(DATE_FORMATTER));
+            
+            // Filter messages for that date
+            List<Message> dateFilteredMessages = conversation.getMessages().stream()
+                .filter(m -> !m.getCreated().isBefore(startOfDay) && !m.getCreated().isAfter(endOfDay))
+                .collect(java.util.stream.Collectors.toList());
+            
+            System.out.println("Found " + dateFilteredMessages.size() + " messages from this date");
+            
+            // Create a new conversation with date-filtered messages
+            Conversation dateFilteredConversation = new Conversation();
+            dateFilteredConversation.setRoom(conversation.getRoom());
+            dateFilteredConversation.setMessages(dateFilteredMessages);
+            conversation = dateFilteredConversation;
         }
         
         System.out.println("\n");
         System.out.println("╭───────────────────────────────────────────────────────────────────────────────╮");
         System.out.println("│                       🔄 GENERATING ANSWER                                    │");
         System.out.println("╰───────────────────────────────────────────────────────────────────────────────╯");
-        System.out.println("\n🔍 Analyzing " + messagesWithContext.size() + " messages to generate an answer...");
+        System.out.println("\n🔍 Analyzing " + conversation.getMessages().size() + " messages to generate an answer...");
         System.out.println("\n⏳ Please wait while I process your question...");
         
-        // Generate and display the answer - already formatted in the QuestionAnswerer class
-        String answer = answerer.generateAnswer(question, messagesWithContext);
+        // Generate the answer using LLM directly on the entire conversation
+        String answer = summarizer.answerQuestion(conversation, question);
         
-        // The answer is already formatted with the question in it
-        System.out.println(answer);
+        // Format and display the answer
+        StringBuilder formattedAnswer = new StringBuilder();
+        formattedAnswer.append("\n");
+        formattedAnswer.append("❓ Question: ").append(question).append("\n");
+        formattedAnswer.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+        formattedAnswer.append("\n");
+        formattedAnswer.append("💬 Answer:\n\n");
+        formattedAnswer.append(answer).append("\n");
+        formattedAnswer.append("\n");
+        formattedAnswer.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+        
+        // Display the formatted answer
+        System.out.println(formattedAnswer.toString());
     }
     
     private boolean containsMessage(List<Message> messages, Message message) {
