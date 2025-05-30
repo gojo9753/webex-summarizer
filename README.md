@@ -118,22 +118,22 @@ java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search 
 
 Ask about discussions from specific dates:
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --question "What did we discuss on May 26th?"
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --question "What did we discuss on May 26th?"
 ```
 
 Filter search results by date range:
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --query "budget" --from 2023-01-01 --to 2023-01-31
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --query "budget" --from 2023-01-01 --to 2023-01-31
 ```
 
 Configure the amount of context shown around search results:
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --query "project" --context 5
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --query "project" --context 5
 ```
 
 Use a specific AWS model for answer generation:
 ```
-java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --question "What are our next steps?" --model anthropic.claude-3-sonnet-20240229-v1:0
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --room ROOM_ID --question "What are our next steps?" --model anthropic.claude-3-sonnet-20240229-v1:0
 ```
 
 ### List Available Rooms
