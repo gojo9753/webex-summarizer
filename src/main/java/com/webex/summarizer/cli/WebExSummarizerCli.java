@@ -34,7 +34,8 @@ import java.util.concurrent.Callable;
             ModelListCommand.class,
             RoomListCommand.class,
             MessageListCommand.class,
-            SummaryCommand.class
+            SummaryCommand.class,
+            SearchCommand.class
         })
 public class WebExSummarizerCli implements Callable<Integer> {
     

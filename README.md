@@ -81,6 +81,40 @@ There are two ways to set your WebEx token:
    java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar --token YOUR_WEBEX_TOKEN
    ```
 
+### Search Conversations and Get Answers
+
+The application allows you to search through conversations and get AI-generated answers to questions based on your message history:
+
+Search for specific keywords in a conversation:
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --query "project deadline"
+```
+
+Ask questions about a conversation and get AI-generated answers:
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --question "When is the project deadline?"
+```
+
+Ask about discussions from specific dates:
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --question "What did we discuss on May 26th?"
+```
+
+Filter search results by date range:
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --query "budget" --from 2023-01-01 --to 2023-01-31
+```
+
+Configure the amount of context shown around search results:
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --query "project" --context 5
+```
+
+Use a specific AWS model for answer generation:
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --question "What are our next steps?" --model anthropic.claude-3-sonnet-20240229-v1:0
+```
+
 ### List Available Rooms
 
 List the WebEx rooms you have access to:
@@ -186,7 +220,31 @@ java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar -s path
 
 For large conversations, the app will automatically split the conversation into manageable chunks, summarize each chunk, and then combine these summaries into a cohesive final summary. Progress indicators will show you the status of this multi-stage process.
 
-### New Subcommands for Room and Message Management
+### New Subcommands for Room, Message and Search Management
+
+#### Search and Answer from Conversations
+
+Search messages and get AI-powered answers to questions about your conversations:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --query "project status"
+```
+
+Ask questions about your conversation content:
+
+```
+java -jar target/webex-summarizer-1.0-SNAPSHOT-jar-with-dependencies.jar search --file "path/to/conversation/file.json" --question "When is the meeting scheduled?"
+```
+
+Advanced options:
+- `--query <text>`: Search term to find in messages
+- `--question <text>`: Question to answer based on the conversation
+- `--context <number>`: Number of messages to include before and after each match (default: 2)
+- `--from <YYYY-MM-DD>`: Start date for filtering messages
+- `--to <YYYY-MM-DD>`: End date for filtering messages
+- `--aws-profile <profile>`: AWS profile to use
+- `--region <region>`: AWS region to use
+- `--model <model-id>`: AWS Bedrock model ID to use
 
 #### List Rooms with Enhanced Options
 
@@ -345,6 +403,15 @@ To contribute to the project:
 - Ensures that each chunk stays below model context limits (15,000 tokens by default)
 - Handles large individual messages by placing them in their own chunks
 - Dynamically adjusts chunking strategy based on conversation characteristics
+
+### Search and Question Answering
+- Full-text search across all messages in a conversation
+- Natural language question answering using AWS Bedrock LLMs
+- Smart date recognition for questions about specific dates (e.g., "What was discussed on May 26th?")
+- Context retrieval to show messages before and after each match
+- Advanced filtering by date range to narrow search results
+- Configurable context window to include surrounding messages
+- Beautifully formatted output with highlighted search matches
 
 ## License
 
